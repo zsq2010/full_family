@@ -1,67 +1,257 @@
 <div class="font-sans">
-  
-  <!-- Scrollable Content Area -->
-  <div class="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8 pb-24">
-    @if (activeTab() === 'home') {
-      <!-- Sticky Header Wrapper -->
-      <div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
-        <!-- Sticky Home Screen Tabs -->
-        <nav #mainNav class="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-200">
-          @if (navigationSource() === 'overview') {
-            <div class="flex items-center h-[38px]">
-              <button (click)="goBackToOverview()" class="flex items-center gap-2 text-slate-600 font-bold hover:text-sky-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                  <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
-                </svg>
-                <span>返回总览</span>
-              </button>
-            </div>
-          } @else {
-            <div class="bg-slate-200/80 p-1 rounded-lg flex flex-wrap gap-1 text-xs font-bold">
-              <button (click)="setActiveHomeTab('all')" [class]="activeHomeTab() === 'all' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
-                全部
-              </button>
-              <button (click)="setActiveHomeTab('daily')" [class]="activeHomeTab() === 'daily' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
-                家庭日常
-              </button>
-              <button (click)="setActiveHomeTab('health')" [class]="activeHomeTab() === 'health' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
-                家庭健康
-              </button>
-              <button (click)="setActiveHomeTab('knowledge')" [class]="activeHomeTab() === 'knowledge' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
-                知识分享
-              </button>
+  @if (!loggedInUser()) {
+    <!-- Login Screen -->
+    <div class="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
+      <h1 class="text-3xl font-bold text-slate-700 mb-2">家事</h1>
+      <p class="text-slate-500 mb-8">请使用您的账户登录</p>
+      
+      <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="w-full max-w-sm space-y-4">
+        <div>
+          <label for="username" class="block text-sm font-medium text-slate-700">用户名</label>
+          <input id="username" type="text" formControlName="username" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium text-slate-700">密码</label>
+          <input id="password" type="password" formControlName="password" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+        </div>
+        
+        @if (loginError()) {
+          <p class="text-sm text-red-600">{{ loginError() }}</p>
+        }
+
+        <button type="submit" [disabled]="loginForm.invalid" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+          登录
+        </button>
+      </form>
+
+      <div class="mt-6 text-xs text-slate-500 text-center p-3 bg-slate-200/80 rounded-lg w-full max-w-sm">
+        <p class="font-bold">测试账户:</p>
+        <p>用户名: me, mom, dad, alex</p>
+        <p>密码: password123</p>
+      </div>
+    </div>
+  } @else {
+    <!-- Main App Content -->
+    <!-- Scrollable Content Area -->
+    <div class="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8 pb-24">
+      @if (activeTab() === 'home') {
+        <!-- Sticky Header Wrapper -->
+        <div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
+          <!-- Sticky Home Screen Tabs -->
+          <nav #mainNav class="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-200">
+            @if (navigationSource() === 'overview') {
+              <div class="flex items-center h-[38px]">
+                <button (click)="goBackToOverview()" class="flex items-center gap-2 text-slate-600 font-bold hover:text-sky-600 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
+                  </svg>
+                  <span>返回总览</span>
+                </button>
+              </div>
+            } @else {
+              <div class="flex items-center justify-between">
+                <div class="bg-slate-200/80 p-1 rounded-lg flex flex-wrap gap-1 text-xs font-bold">
+                  <button (click)="setActiveHomeTab('all')" [class]="activeHomeTab() === 'all' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                    全部
+                  </button>
+                  <button (click)="setActiveHomeTab('daily')" [class]="activeHomeTab() === 'daily' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                    家庭日常
+                  </button>
+                  <button (click)="setActiveHomeTab('health')" [class]="activeHomeTab() === 'health' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                    家庭健康
+                  </button>
+                  <button (click)="setActiveHomeTab('knowledge')" [class]="activeHomeTab() === 'knowledge' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                    知识分享
+                  </button>
+                </div>
+                 <button (click)="logout()" class="p-2 rounded-full hover:bg-slate-200 transition-colors" aria-label="切换用户">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-slate-600">
+                      <path fill-rule="evenodd" d="M2 3.25A1.25 1.25 0 0 1 3.25 2h6.5A1.25 1.25 0 0 1 11 3.25v.5a.75.75 0 0 1-1.5 0v-.5a.25.25 0 0 0-.25-.25h-5.5a.25.25 0 0 0-.25.25v13.5c0 .138.112.25.25.25h5.5a.25.25 0 0 0 .25-.25v-.5a.75.75 0 0 1 1.5 0v.5A1.25 1.25 0 0 1 9.75 18h-6.5A1.25 1.25 0 0 1 2 16.75V3.25Z" clip-rule="evenodd" />
+                      <path fill-rule="evenodd" d="M13.44 10.78a.75.75 0 0 0 0-1.56l-3.25-1.5a.75.75 0 0 0-.94 1.28L10.44 10l-1.19 1.53a.75.75 0 0 0 .94 1.28l3.25-1.5Z" clip-rule="evenodd" />
+                      <path fill-rule="evenodd" d="M16.25 10a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0 0 1.5h5.5a.75.75 0 0 0 .75-.75Z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+              </div>
+            }
+          </nav>
+
+          <!-- Sticky Health Notice -->
+          @if (urgentHealthPosts().length > 0) {
+            <div #stickyNotice class="shadow-md animate-fade-in-down -mx-4 sm:-mx-6 lg:-mx-8 border-b border-slate-200">
+                @for(post of urgentHealthPosts(); track post.id) {
+                    @let typeConfig = getPostTypeConfig(post);
+                    <div (click)="scrollToPost(post.id)" [class]="'px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm border-b cursor-pointer hover:bg-red-100/50 transition-colors ' + typeConfig.colorClasses" [class.border-red-300]="true">
+                        <span [class]="typeConfig.iconClasses + ' text-lg'">{{ typeConfig.icon }}</span>
+                        @if (post.subject) {
+                            <img [ngSrc]="post.subject.avatar" [alt]="post.subject.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                        }
+                        <p class="font-semibold truncate flex-1">
+                          {{ typeConfig.title }}: 
+                          <span class="font-normal">{{ post.content }}</span>
+                        </p>
+                        <span class="text-xs font-medium text-red-700/80">{{post.timestamp}}</span>
+                    </div>
+                }
             </div>
           }
-        </nav>
+        </div>
 
-        <!-- Sticky Health Notice -->
-        @if (urgentHealthPosts().length > 0) {
-          <div #stickyNotice class="shadow-md animate-fade-in-down -mx-4 sm:-mx-6 lg:-mx-8 border-b border-slate-200">
+        <main class="mt-6 space-y-6">
+          <!-- Pinned Urgent Health Post (Full) -->
+          @if (urgentHealthPosts().length > 0) {
+            <div class="space-y-6">
               @for(post of urgentHealthPosts(); track post.id) {
-                  @let typeConfig = getPostTypeConfig(post);
-                  <div (click)="scrollToPost(post.id)" [class]="'px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm border-b cursor-pointer hover:bg-red-100/50 transition-colors ' + typeConfig.colorClasses" [class.border-red-300]="true">
-                      <span [class]="typeConfig.iconClasses + ' text-lg'">{{ typeConfig.icon }}</span>
-                      @if (post.subject) {
-                          <img [ngSrc]="post.subject.avatar" [alt]="post.subject.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
-                      }
-                      <p class="font-semibold truncate flex-1">
-                        {{ typeConfig.title }}: 
-                        <span class="font-normal">{{ post.content }}</span>
-                      </p>
-                      <span class="text-xs font-medium text-red-700/80">{{post.timestamp}}</span>
-                  </div>
-              }
-          </div>
-        }
-      </div>
+                @let typeConfig = getPostTypeConfig(post);
+                @let isMyPost = post.author === loggedInUser()!.name;
+                <div class="flex flex-col" [id]="'post-' + post.id">
+                  <!-- Message Row -->
+                  <div [class]="'flex items-start gap-3' + (isMyPost ? ' justify-end' : '')">
+                    
+                    <!-- Avatar for others -->
+                    @if (!isMyPost) {
+                      <img [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
+                    }
+              
+                    <div [class]="'w-full max-w-md flex flex-col' + (isMyPost ? ' items-end' : ' items-start')">
+                      <!-- Message Bubble -->
+                      <div [class]="'p-4 shadow-lg w-full ring-2 ring-rose-500/50 rounded-xl ' + typeConfig.bubbleClasses + (isMyPost ? ' rounded-tr-none' : ' rounded-tl-none')">
+                        <!-- Bubble Header (Icon, Title, Priority, etc.) -->
+                        <div class="flex justify-between items-start gap-4">
+                          <h3 [class]="'font-bold text-base flex items-center gap-2 ' + typeConfig.headerTextClasses">
+                            <span [class]="typeConfig.iconClasses">{{ typeConfig.icon }}</span>
+                            <span>{{ typeConfig.title }}</span>
+                          </h3>
+                          <div class="flex items-center gap-2 shrink-0">
+                            @if (post.dueDate) {
+                              @let countdown = getCountdown(post.dueDate);
+                              @if (countdown) {
+                                <div [class]="'flex items-center gap-1.5 font-semibold text-sm ' + typeConfig.countdownClasses">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 animate-pulse">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                                  </svg>
+                                  <span>{{ countdown }}</span>
+                                </div>
+                              }
+                            }
+                            @if (post.priority) {
+                              <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.priorityChipClasses(post.priority)">
+                                {{ getPriorityConfig(post.priority).text }}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                        <!-- Bubble Content -->
+                        <p [class]="'mt-2 leading-relaxed ' + typeConfig.bodyTextClasses">{{ post.content }}</p>
 
-      <main class="mt-6 space-y-6">
-        <!-- Pinned Urgent Health Post (Full) -->
-        @if (urgentHealthPosts().length > 0) {
-          <div class="space-y-6">
-            @for(post of urgentHealthPosts(); track post.id) {
+                        <!-- Media Display -->
+                        @if (post.media && post.media.length > 0) {
+                          <div class="mt-3 grid gap-2" [class.grid-cols-2]="post.media.length > 1">
+                              @for (item of post.media; track item.url) {
+                                  @if (item.type === 'image') {
+                                      <img [ngSrc]="item.url" alt="Post media" width="400" height="250" class="rounded-lg object-cover w-full">
+                                  }
+                                  @if (item.type === 'video') {
+                                      <video [src]="item.url" controls class="rounded-lg w-full bg-black"></video>
+                                  }
+                              }
+                          </div>
+                        }
+
+                        <!-- Timestamp -->
+                        <div [class]="'text-center text-xs mt-3 ' + typeConfig.timestampClasses">
+                          {{ post.timestamp }}
+                        </div>
+              
+                        <!-- Task/Chore Section -->
+                        @if (post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT') {
+                          <div [class]="'mt-4 flex items-center justify-between gap-4 border-t pt-3 ' + typeConfig.separatorBorderClasses">
+                            <div class="flex items-center">
+                              @if (post.status) {
+                                <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.statusChipClasses(post.status)">
+                                  {{ getNeedStatusConfig(post.status).text }}
+                                </span>
+                              }
+                              <div class="flex -space-x-2 ml-3">
+                                @for(assignee of post.assignees; track assignee.name) {
+                                  <img [ngSrc]="assignee.avatar" [alt]="assignee.name" width="28" height="28" class="inline-block h-7 w-7 rounded-full ring-2" [class]="typeConfig.assigneeRingClasses" [title]="assignee.name">
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- Reactions Display -->
+                        @if(post.reactions.length > 0) {
+                            <div [class]="'mt-4 pt-3 border-t space-y-2 ' + typeConfig.separatorBorderClasses">
+                                @for(reactionType of reactionTypes; track reactionType) {
+                                    @let reactors = getReactionsByType(post, reactionType);
+                                    @if(reactors.length > 0) {
+                                        @let reactionConfig = getReactionConfig(reactionType);
+                                        <div class="flex items-center gap-2 text-sm">
+                                            <span [class]="'font-semibold ' + typeConfig.bodyTextClasses">{{ reactionConfig.label }}</span>
+                                            <div class="flex -space-x-2">
+                                                @for(user of reactors; track user.name) {
+                                                    <img [ngSrc]="user.avatar" [alt]="user.name" width="24" height="24" class="inline-block h-6 w-6 rounded-full ring-2" [class]="typeConfig.assigneeRingClasses" [title]="user.name">
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+              
+                        <!-- Bubble Footer (Reply) -->
+                        <div [class]="'mt-3 border-t pt-2 flex justify-between items-center ' + typeConfig.separatorBorderClasses">
+                          <div class="flex items-center gap-2">
+                              <button (click)="addReaction(post.id, 'ILL_DO_IT')" [disabled]="hasReacted(post, 'ILL_DO_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我来做</button>
+                              <button (click)="addReaction(post.id, 'ILL_JOIN')" [disabled]="hasReacted(post, 'ILL_JOIN')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我参加</button>
+                              <button (click)="addReaction(post.id, 'GOT_IT')" [disabled]="hasReacted(post, 'GOT_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我知道了</button>
+                          </div>
+                          <button (click)="addComment(post.id)" [class]="'transition-colors p-1 rounded-full ' + (post.type === 'DISCOVERY' || post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT' ? ' text-white/70 hover:text-white hover:bg-white/20' : ' text-slate-400 hover:text-slate-600 hover:bg-slate-100')" aria-label="回复">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                <path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 0 1-.025 1.06L3.622 7.25h6.128a5.25 5.25 0 0 1 0 10.5H8.75a.75.75 0 0 1 0-1.5h1.001a3.75 3.75 0 1 0 0-7.5H3.622l4.146 3.957a.75.75 0 0 1-1.036 1.085l-5.5-5.25a.75.75 0 0 1 0-1.085l5.5-5.25a.75.75 0 0 1 1.06.025Z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                        </div>
+              
+                      </div>
+                    </div>
+                    
+                    <!-- Avatar for me -->
+                    @if (isMyPost) {
+                      <img [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
+                    }
+                  </div>
+                  
+                  <!-- Comments Section -->
+                  @if (post.comments.length > 0) {
+                    <div [class]="'mt-2 space-y-2 w-full max-w-md' + (isMyPost ? ' self-end pr-12' : ' self-start pl-12')">
+                      @for(comment of post.comments; track comment.id) {
+                        <div class="flex items-start gap-2.5 text-sm w-full">
+                          @if (comment.author !== loggedInUser()!.name) {
+                            <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
+                          }
+                          <div [class]="'flex-1 rounded-lg px-3 py-2' + (comment.author === loggedInUser()!.name ? ' bg-sky-100' : ' bg-slate-100')">
+                            <p class="font-semibold text-slate-800">{{comment.author}}</p>
+                            <p class="text-slate-600">{{comment.content}}</p>
+                          </div>
+                          @if (comment.author === loggedInUser()!.name) {
+                            <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (homePosts().length > 0) {
+            @for (post of homePosts(); track post.id) {
               @let typeConfig = getPostTypeConfig(post);
-              @let isMyPost = post.author === currentUser.name;
+              @let isMyPost = post.author === loggedInUser()!.name;
+
               <div class="flex flex-col" [id]="'post-' + post.id">
                 <!-- Message Row -->
                 <div [class]="'flex items-start gap-3' + (isMyPost ? ' justify-end' : '')">
@@ -73,7 +263,7 @@
             
                   <div [class]="'w-full max-w-md flex flex-col' + (isMyPost ? ' items-end' : ' items-start')">
                     <!-- Message Bubble -->
-                    <div [class]="'p-4 shadow-lg w-full ring-2 ring-rose-500/50 rounded-xl ' + typeConfig.bubbleClasses + (isMyPost ? ' rounded-tr-none' : ' rounded-tl-none')">
+                    <div [class]="'p-4 shadow-sm w-full rounded-xl ' + typeConfig.bubbleClasses + (isMyPost ? ' rounded-tr-none' : ' rounded-tl-none')">
                       <!-- Bubble Header (Icon, Title, Priority, etc.) -->
                       <div class="flex justify-between items-start gap-4">
                         <h3 [class]="'font-bold text-base flex items-center gap-2 ' + typeConfig.headerTextClasses">
@@ -126,7 +316,7 @@
                         <div [class]="'mt-4 flex items-center justify-between gap-4 border-t pt-3 ' + typeConfig.separatorBorderClasses">
                           <div class="flex items-center">
                             @if (post.status) {
-                               <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.statusChipClasses(post.status)">
+                              <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.statusChipClasses(post.status)">
                                 {{ getNeedStatusConfig(post.status).text }}
                               </span>
                             }
@@ -161,12 +351,12 @@
             
                       <!-- Bubble Footer (Reply) -->
                       <div [class]="'mt-3 border-t pt-2 flex justify-between items-center ' + typeConfig.separatorBorderClasses">
-                         <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2">
                             <button (click)="addReaction(post.id, 'ILL_DO_IT')" [disabled]="hasReacted(post, 'ILL_DO_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我来做</button>
                             <button (click)="addReaction(post.id, 'ILL_JOIN')" [disabled]="hasReacted(post, 'ILL_JOIN')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我参加</button>
                             <button (click)="addReaction(post.id, 'GOT_IT')" [disabled]="hasReacted(post, 'GOT_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我知道了</button>
-                         </div>
-                         <button (click)="addComment(post.id)" [class]="'transition-colors p-1 rounded-full ' + (post.type === 'DISCOVERY' || post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT' ? ' text-white/70 hover:text-white hover:bg-white/20' : ' text-slate-400 hover:text-slate-600 hover:bg-slate-100')" aria-label="回复">
+                        </div>
+                        <button (click)="addComment(post.id)" [class]="'transition-colors p-1 rounded-full ' + (post.type === 'DISCOVERY' || post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT' ? ' text-white/70 hover:text-white hover:bg-white/20' : ' text-slate-400 hover:text-slate-600 hover:bg-slate-100')" aria-label="回复">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
                               <path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 0 1-.025 1.06L3.622 7.25h6.128a5.25 5.25 0 0 1 0 10.5H8.75a.75.75 0 0 1 0-1.5h1.001a3.75 3.75 0 1 0 0-7.5H3.622l4.146 3.957a.75.75 0 0 1-1.036 1.085l-5.5-5.25a.75.75 0 0 1 0-1.085l5.5-5.25a.75.75 0 0 1 1.06.025Z" clip-rule="evenodd" />
                             </svg>
@@ -187,14 +377,14 @@
                   <div [class]="'mt-2 space-y-2 w-full max-w-md' + (isMyPost ? ' self-end pr-12' : ' self-start pl-12')">
                     @for(comment of post.comments; track comment.id) {
                       <div class="flex items-start gap-2.5 text-sm w-full">
-                        @if (comment.author !== currentUser.name) {
+                        @if (comment.author !== loggedInUser()!.name) {
                           <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
                         }
-                        <div [class]="'flex-1 rounded-lg px-3 py-2' + (comment.author === currentUser.name ? ' bg-sky-100' : ' bg-slate-100')">
+                        <div [class]="'flex-1 rounded-lg px-3 py-2' + (comment.author === loggedInUser()!.name ? ' bg-sky-100' : ' bg-slate-100')">
                           <p class="font-semibold text-slate-800">{{comment.author}}</p>
                           <p class="text-slate-600">{{comment.content}}</p>
                         </div>
-                        @if (comment.author === currentUser.name) {
+                        @if (comment.author === loggedInUser()!.name) {
                           <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
                         }
                       </div>
@@ -203,346 +393,198 @@
                 }
               </div>
             }
-          </div>
-        }
+          } @else {
+            @if (urgentHealthPosts().length === 0) {
+              <div class="text-center py-16">
+                <p class="text-5xl mb-2">💨</p>
+                <p class="text-slate-500 font-medium">这里什么都没有。</p>
+              </div>
+            }
+          }
+          <footer class="text-center pt-4">
+              <p class="text-sm text-slate-400">&copy; {{ currentYear }} 家事 家庭应用</p>
+          </footer>
+        </main>
+      }
 
-        @if (homePosts().length > 0) {
-          @for (post of homePosts(); track post.id) {
-            @let typeConfig = getPostTypeConfig(post);
-            @let isMyPost = post.author === currentUser.name;
-
-            <div class="flex flex-col" [id]="'post-' + post.id">
-              <!-- Message Row -->
-              <div [class]="'flex items-start gap-3' + (isMyPost ? ' justify-end' : '')">
-                
-                <!-- Avatar for others -->
-                @if (!isMyPost) {
-                  <img [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
-                }
-          
-                <div [class]="'w-full max-w-md flex flex-col' + (isMyPost ? ' items-end' : ' items-start')">
-                  <!-- Message Bubble -->
-                  <div [class]="'p-4 shadow-sm w-full rounded-xl ' + typeConfig.bubbleClasses + (isMyPost ? ' rounded-tr-none' : ' rounded-tl-none')">
-                    <!-- Bubble Header (Icon, Title, Priority, etc.) -->
-                    <div class="flex justify-between items-start gap-4">
-                      <h3 [class]="'font-bold text-base flex items-center gap-2 ' + typeConfig.headerTextClasses">
-                        <span [class]="typeConfig.iconClasses">{{ typeConfig.icon }}</span>
-                        <span>{{ typeConfig.title }}</span>
-                      </h3>
-                      <div class="flex items-center gap-2 shrink-0">
-                        @if (post.dueDate) {
-                          @let countdown = getCountdown(post.dueDate);
-                          @if (countdown) {
-                            <div [class]="'flex items-center gap-1.5 font-semibold text-sm ' + typeConfig.countdownClasses">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 animate-pulse">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
-                              </svg>
-                              <span>{{ countdown }}</span>
-                            </div>
-                          }
-                        }
-                        @if (post.priority) {
-                           <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.priorityChipClasses(post.priority)">
-                            {{ getPriorityConfig(post.priority).text }}
-                          </span>
-                        }
-                      </div>
-                    </div>
-                    <!-- Bubble Content -->
-                    <p [class]="'mt-2 leading-relaxed ' + typeConfig.bodyTextClasses">{{ post.content }}</p>
-
-                    <!-- Media Display -->
-                    @if (post.media && post.media.length > 0) {
-                      <div class="mt-3 grid gap-2" [class.grid-cols-2]="post.media.length > 1">
-                          @for (item of post.media; track item.url) {
-                              @if (item.type === 'image') {
-                                  <img [ngSrc]="item.url" alt="Post media" width="400" height="250" class="rounded-lg object-cover w-full">
-                              }
-                              @if (item.type === 'video') {
-                                  <video [src]="item.url" controls class="rounded-lg w-full bg-black"></video>
-                              }
-                          }
-                      </div>
+      @if (activeTab() === 'overview') {
+        <main class="mt-6">
+          <!-- Overview Dashboard Section -->
+          <section class="space-y-8">
+              
+              <!-- 家庭日常 Section -->
+              <div>
+                <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
+                  <span class="text-sky-500 text-xl">📝</span>
+                  <span>家庭日常</span>
+                </h3>
+                @if (dailyPosts().length > 0) {
+                  <div class="space-y-2">
+                    @for (post of dailyPosts(); track post.id) {
+                      @let typeConfig = getPostTypeConfig(post);
+                      <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-slate-100 ' + typeConfig.colorClasses">
+                          <span class="text-lg">{{ typeConfig.icon }}</span>
+                          <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
+                          <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
+                      </button>
                     }
+                  </div>
+                } @else {
+                  <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
+                    <p class="text-sm text-slate-500">这里很整洁！</p>
+                  </div>
+                }
+              </div>
 
-                    <!-- Timestamp -->
-                    <div [class]="'text-center text-xs mt-3 ' + typeConfig.timestampClasses">
-                      {{ post.timestamp }}
-                    </div>
-          
-                    <!-- Task/Chore Section -->
-                    @if (post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT') {
-                      <div [class]="'mt-4 flex items-center justify-between gap-4 border-t pt-3 ' + typeConfig.separatorBorderClasses">
-                        <div class="flex items-center">
-                          @if (post.status) {
-                             <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.statusChipClasses(post.status)">
-                              {{ getNeedStatusConfig(post.status).text }}
-                            </span>
-                          }
-                          <div class="flex -space-x-2 ml-3">
-                            @for(assignee of post.assignees; track assignee.name) {
-                              <img [ngSrc]="assignee.avatar" [alt]="assignee.name" width="28" height="28" class="inline-block h-7 w-7 rounded-full ring-2" [class]="typeConfig.assigneeRingClasses" [title]="assignee.name">
+              <!-- 家庭健康 Section -->
+              <div>
+                <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
+                  <span class="text-red-500 text-xl">🏥</span>
+                  <span>家庭健康</span>
+                </h3>
+                @if (healthPosts().length > 0) {
+                  <div class="space-y-2">
+                    @for (post of healthPosts(); track post.id) {
+                      @let typeConfig = getPostTypeConfig(post);
+                      <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-red-50 ' + typeConfig.colorClasses">
+                          <div class="relative">
+                            <span class="text-lg">{{ typeConfig.icon }}</span>
+                            @if(post.type === 'EVENT' || post.type === 'MEDICATION' || post.type === 'FEELING') {
+                              <span class="absolute top-0 right-0 block h-2 w-2 transform translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-white"></span>
                             }
                           </div>
-                        </div>
-                      </div>
+                          <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
+                          <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
+                      </button>
                     }
-
-                    <!-- Reactions Display -->
-                    @if(post.reactions.length > 0) {
-                        <div [class]="'mt-4 pt-3 border-t space-y-2 ' + typeConfig.separatorBorderClasses">
-                            @for(reactionType of reactionTypes; track reactionType) {
-                                @let reactors = getReactionsByType(post, reactionType);
-                                @if(reactors.length > 0) {
-                                    @let reactionConfig = getReactionConfig(reactionType);
-                                    <div class="flex items-center gap-2 text-sm">
-                                        <span [class]="'font-semibold ' + typeConfig.bodyTextClasses">{{ reactionConfig.label }}</span>
-                                        <div class="flex -space-x-2">
-                                            @for(user of reactors; track user.name) {
-                                                <img [ngSrc]="user.avatar" [alt]="user.name" width="24" height="24" class="inline-block h-6 w-6 rounded-full ring-2" [class]="typeConfig.assigneeRingClasses" [title]="user.name">
-                                            }
-                                        </div>
-                                    </div>
-                                }
-                            }
-                        </div>
-                    }
-          
-                    <!-- Bubble Footer (Reply) -->
-                    <div [class]="'mt-3 border-t pt-2 flex justify-between items-center ' + typeConfig.separatorBorderClasses">
-                       <div class="flex items-center gap-2">
-                          <button (click)="addReaction(post.id, 'ILL_DO_IT')" [disabled]="hasReacted(post, 'ILL_DO_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我来做</button>
-                          <button (click)="addReaction(post.id, 'ILL_JOIN')" [disabled]="hasReacted(post, 'ILL_JOIN')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我参加</button>
-                          <button (click)="addReaction(post.id, 'GOT_IT')" [disabled]="hasReacted(post, 'GOT_IT')" [class]="'text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' + typeConfig.reactionButtonClasses">我知道了</button>
-                       </div>
-                       <button (click)="addComment(post.id)" [class]="'transition-colors p-1 rounded-full ' + (post.type === 'DISCOVERY' || post.type === 'TASK' || post.type === 'CHORE' || post.type === 'APPOINTMENT' ? ' text-white/70 hover:text-white hover:bg-white/20' : ' text-slate-400 hover:text-slate-600 hover:bg-slate-100')" aria-label="回复">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                            <path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 0 1-.025 1.06L3.622 7.25h6.128a5.25 5.25 0 0 1 0 10.5H8.75a.75.75 0 0 1 0-1.5h1.001a3.75 3.75 0 1 0 0-7.5H3.622l4.146 3.957a.75.75 0 0 1-1.036 1.085l-5.5-5.25a.75.75 0 0 1 0-1.085l5.5-5.25a.75.75 0 0 1 1.06.025Z" clip-rule="evenodd" />
-                          </svg>
-                        </button>
-                    </div>
-          
                   </div>
-                </div>
-                
-                <!-- Avatar for me -->
-                @if (isMyPost) {
-                  <img [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
+                } @else {
+                  <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
+                    <p class="text-sm text-slate-500">一切安好。</p>
+                  </div>
                 }
               </div>
               
-              <!-- Comments Section -->
-              @if (post.comments.length > 0) {
-                <div [class]="'mt-2 space-y-2 w-full max-w-md' + (isMyPost ? ' self-end pr-12' : ' self-start pl-12')">
-                  @for(comment of post.comments; track comment.id) {
-                    <div class="flex items-start gap-2.5 text-sm w-full">
-                      @if (comment.author !== currentUser.name) {
-                        <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
-                      }
-                      <div [class]="'flex-1 rounded-lg px-3 py-2' + (comment.author === currentUser.name ? ' bg-sky-100' : ' bg-slate-100')">
-                        <p class="font-semibold text-slate-800">{{comment.author}}</p>
-                        <p class="text-slate-600">{{comment.content}}</p>
-                      </div>
-                      @if (comment.author === currentUser.name) {
-                        <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="28" height="28" class="h-7 w-7 rounded-full object-cover flex-shrink-0">
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          }
-        } @else {
-           @if (urgentHealthPosts().length === 0) {
-            <div class="text-center py-16">
-              <p class="text-5xl mb-2">💨</p>
-              <p class="text-slate-500 font-medium">这里什么都没有。</p>
-            </div>
-           }
-        }
-        <footer class="text-center pt-4">
-            <p class="text-sm text-slate-400">&copy; {{ currentYear }} 家事 家庭应用</p>
-        </footer>
-      </main>
+              <!-- 知识分享 Section -->
+              <div>
+                <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
+                  <span class="text-purple-500 text-xl">💡</span>
+                  <span>知识分享</span>
+                </h3>
+                @if (discoveries().length > 0) {
+                  <div class="space-y-2">
+                    @for (post of discoveries(); track post.id) {
+                      @let typeConfig = getPostTypeConfig(post);
+                      <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-purple-50 ' + typeConfig.colorClasses">
+                          <span class="text-lg">{{ typeConfig.icon }}</span>
+                          <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
+                          <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
+                    <p class="text-sm text-slate-500">还没有任何发现。</p>
+                  </div>
+                }
+              </div>
+          
+          </section>
+          <footer class="text-center mt-12 py-4">
+              <p class="text-sm text-slate-400">&copy; {{ currentYear }} 家事 家庭应用</p>
+          </footer>
+        </main>
+      }
+    </div>
+    
+    <!-- Backdrop for overlays -->
+    @if (isFabMenuOpen() || isNewPostPanelOpen()) {
+      <div (click)="isFabMenuOpen() ? toggleFabMenu() : closeNewPostPanel()" class="fixed inset-0 bg-black/40 z-30 animate-fade-in"></div>
     }
 
-    @if (activeTab() === 'overview') {
-      <main class="mt-6">
-        <!-- Overview Dashboard Section -->
-        <section class="space-y-8">
-            
-            <!-- 家庭日常 Section -->
-            <div>
-              <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
-                <span class="text-sky-500 text-xl">📝</span>
-                <span>家庭日常</span>
-              </h3>
-              @if (dailyPosts().length > 0) {
-                <div class="space-y-2">
-                  @for (post of dailyPosts(); track post.id) {
-                    @let typeConfig = getPostTypeConfig(post);
-                    <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-slate-100 ' + typeConfig.colorClasses">
-                        <span class="text-lg">{{ typeConfig.icon }}</span>
-                        <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
-                        <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
-                    </button>
-                  }
-                </div>
-              } @else {
-                <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
-                  <p class="text-sm text-slate-500">这里很整洁！</p>
-                </div>
-              }
-            </div>
-
-            <!-- 家庭健康 Section -->
-            <div>
-              <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
-                <span class="text-red-500 text-xl">🏥</span>
-                <span>家庭健康</span>
-              </h3>
-              @if (healthPosts().length > 0) {
-                <div class="space-y-2">
-                  @for (post of healthPosts(); track post.id) {
-                    @let typeConfig = getPostTypeConfig(post);
-                     <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-red-50 ' + typeConfig.colorClasses">
-                        <div class="relative">
-                           <span class="text-lg">{{ typeConfig.icon }}</span>
-                           @if(post.type === 'EVENT' || post.type === 'MEDICATION' || post.type === 'FEELING') {
-                            <span class="absolute top-0 right-0 block h-2 w-2 transform translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-white"></span>
-                           }
-                        </div>
-                        <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
-                        <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
-                    </button>
-                  }
-                </div>
-              } @else {
-                <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
-                  <p class="text-sm text-slate-500">一切安好。</p>
-                </div>
-              }
-            </div>
-            
-            <!-- 知识分享 Section -->
-            <div>
-              <h3 class="text-base font-bold text-slate-600 mb-3 flex items-center gap-2">
-                 <span class="text-purple-500 text-xl">💡</span>
-                <span>知识分享</span>
-              </h3>
-              @if (discoveries().length > 0) {
-                <div class="space-y-2">
-                  @for (post of discoveries(); track post.id) {
-                    @let typeConfig = getPostTypeConfig(post);
-                    <button (click)="viewPostFromOverview(post)" [class]="'p-3 rounded-lg border flex items-center gap-3 text-sm w-full text-left transition-colors hover:bg-purple-50 ' + typeConfig.colorClasses">
-                        <span class="text-lg">{{ typeConfig.icon }}</span>
-                        <p class="flex-1 text-slate-700 truncate">{{ post.content }}</p>
-                        <img [ngSrc]="post.authorAvatar" [alt]="post.author" width="24" height="24" class="h-6 w-6 rounded-full ring-2 ring-white/50" [title]="post.author">
-                    </button>
-                  }
-                </div>
-              } @else {
-                <div class="text-center py-4 px-3 rounded-lg border border-dashed border-slate-300">
-                  <p class="text-sm text-slate-500">还没有任何发现。</p>
-                </div>
-              }
-            </div>
-        
-        </section>
-        <footer class="text-center mt-12 py-4">
-            <p class="text-sm text-slate-400">&copy; {{ currentYear }} 家事 家庭应用</p>
-        </footer>
-      </main>
+    <!-- New Post Panel -->
+    @if (isNewPostPanelOpen()) {
+      <div class="fixed bottom-0 left-0 right-0 max-w-2xl mx-auto p-4 z-40 animate-slide-in-up">
+        <div class="bg-white rounded-xl shadow-2xl p-4">
+          <h3 class="font-bold text-lg text-slate-800 text-center mb-3">写点东西</h3>
+          <textarea 
+            [value]="newPostContent()" 
+            (input)="onNewPostInput($event)"
+            class="w-full bg-slate-100 border-slate-300 rounded-md focus:ring-sky-500 focus:border-sky-500 text-slate-800 placeholder-slate-400" 
+            rows="4" 
+            placeholder="分享家庭的新鲜事..."></textarea>
+          <div class="mt-3">
+              <p class="text-xs font-semibold text-slate-500 mb-2">选择分类</p>
+              <div class="flex flex-wrap gap-2 text-sm font-bold">
+                <button (click)="newPostCategory.set('daily')" [class]="newPostCategory() === 'daily' ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">📝 家庭日常</button>
+                <button (click)="newPostCategory.set('health')" [class]="newPostCategory() === 'health' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">🏥 家庭健康</button>
+                <button (click)="newPostCategory.set('knowledge')" [class]="newPostCategory() === 'knowledge' ? 'bg-purple-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">💡 知识分享</button>
+              </div>
+          </div>
+          <div class="mt-4 flex justify-end gap-3">
+            <button (click)="closeNewPostPanel()" class="px-4 py-2 rounded-lg text-slate-600 font-semibold hover:bg-slate-100">取消</button>
+            <button (click)="publishNewPost()" [disabled]="!newPostContent()" class="px-6 py-2 rounded-lg bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed">发布</button>
+          </div>
+        </div>
+      </div>
     }
-  </div>
-  
-  <!-- Backdrop for overlays -->
-  @if (isFabMenuOpen() || isNewPostPanelOpen()) {
-    <div (click)="isFabMenuOpen() ? toggleFabMenu() : closeNewPostPanel()" class="fixed inset-0 bg-black/40 z-30 animate-fade-in"></div>
-  }
 
-  <!-- New Post Panel -->
-  @if (isNewPostPanelOpen()) {
-    <div class="fixed bottom-0 left-0 right-0 max-w-2xl mx-auto p-4 z-40 animate-slide-in-up">
-      <div class="bg-white rounded-xl shadow-2xl p-4">
-        <h3 class="font-bold text-lg text-slate-800 text-center mb-3">写点东西</h3>
-        <textarea 
-          [value]="newPostContent()" 
-          (input)="onNewPostInput($event)"
-          class="w-full bg-slate-100 border-slate-300 rounded-md focus:ring-sky-500 focus:border-sky-500 text-slate-800 placeholder-slate-400" 
-          rows="4" 
-          placeholder="分享家庭的新鲜事..."></textarea>
-        <div class="mt-3">
-            <p class="text-xs font-semibold text-slate-500 mb-2">选择分类</p>
-            <div class="flex flex-wrap gap-2 text-sm font-bold">
-              <button (click)="newPostCategory.set('daily')" [class]="newPostCategory() === 'daily' ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">📝 家庭日常</button>
-              <button (click)="newPostCategory.set('health')" [class]="newPostCategory() === 'health' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">🏥 家庭健康</button>
-              <button (click)="newPostCategory.set('knowledge')" [class]="newPostCategory() === 'knowledge' ? 'bg-purple-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'" class="px-3 py-1 rounded-full transition-colors">💡 知识分享</button>
-            </div>
+    <!-- Fixed Bottom Navigation -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-slate-200 z-30">
+      <nav class="max-w-2xl mx-auto grid grid-cols-3 items-center h-16 px-4">
+        <!-- Home Tab -->
+        <button (click)="setActiveTab('home')" class="flex flex-col items-center justify-center gap-1 transition-colors" [class.text-sky-500]="activeTab() === 'home'" [class.text-slate-500]="activeTab() !== 'home'">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
+            <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" />
+          </svg>
+          <span class="text-xs font-bold">首页</span>
+        </button>
+
+        <!-- Centered FAB -->
+        <div class="flex justify-center">
+          <button (click)="toggleFabMenu()" aria-label="创建新帖子" class="bg-sky-500 text-white rounded-full p-4 hover:bg-sky-600 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 shadow-lg relative">
+            @if(isFabMenuOpen()) {
+              <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            } @else {
+              <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            }
+          </button>
         </div>
-        <div class="mt-4 flex justify-end gap-3">
-          <button (click)="closeNewPostPanel()" class="px-4 py-2 rounded-lg text-slate-600 font-semibold hover:bg-slate-100">取消</button>
-          <button (click)="publishNewPost()" [disabled]="!newPostContent()" class="px-6 py-2 rounded-lg bg-sky-500 text-white font-semibold hover:bg-sky-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed">发布</button>
-        </div>
+
+        <!-- Overview Tab -->
+        <button (click)="setActiveTab('overview')" class="flex flex-col items-center justify-center gap-1 transition-colors" [class.text-sky-500]="activeTab() === 'overview'" [class.text-slate-500]="activeTab() !== 'overview'">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
+            <path d="M3 3.5A1.5 1.5 0 0 1 4.5 2h11A1.5 1.5 0 0 1 17 3.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-11Zm2 1.5v1.5h10V5H5Zm0 3v1.5h10V8H5Zm0 3v1.5h10v-1.5H5Z" />
+          </svg>
+          <span class="text-xs font-bold">总览</span>
+        </button>
+      </nav>
+    </footer>
+
+    <!-- FAB Menu Popup -->
+    @if(isFabMenuOpen()) {
+      <div class="fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col-reverse items-center gap-3 animate-fade-in-down z-40">
+          <button (click)="openNewPostPanel()" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-slate-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
+              <span class="text-xl">📝</span>
+              <span>写点东西</span>
+          </button>
+          <button (click)="quickSend('meeting')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-green-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
+              <span class="text-xl">📅</span>
+              <span>开个会</span>
+          </button>
+          <button (click)="quickSend('help')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-sky-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
+              <span class="text-xl">🙋</span>
+              <span>求帮助</span>
+          </button>
+          <button (click)="quickSend('care')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-rose-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
+              <span class="text-xl">🤒</span>
+              <span>求关心</span>
+          </button>
       </div>
-    </div>
-  }
-
-  <!-- Fixed Bottom Navigation -->
-  <footer class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-slate-200 z-30">
-    <nav class="max-w-2xl mx-auto flex justify-around items-center h-16 px-4">
-      <!-- Home Tab -->
-      <button (click)="setActiveTab('home')" class="flex flex-col items-center justify-center gap-1 w-24 transition-colors" [class.text-sky-500]="activeTab() === 'home'" [class.text-slate-500]="activeTab() !== 'home'">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
-          <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" />
-        </svg>
-        <span class="text-xs font-bold">首页</span>
-      </button>
-
-      <!-- Centered FAB -->
-      <div>
-        <button (click)="toggleFabMenu()" aria-label="创建新帖子" class="bg-sky-500 text-white rounded-full p-4 hover:bg-sky-600 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 shadow-lg relative">
-          @if(isFabMenuOpen()) {
-            <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          } @else {
-            <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          }
-        </button>
-      </div>
-
-      <!-- Overview Tab -->
-      <button (click)="setActiveTab('overview')" class="flex flex-col items-center justify-center gap-1 w-24 transition-colors" [class.text-sky-500]="activeTab() === 'overview'" [class.text-slate-500]="activeTab() !== 'overview'">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
-          <path d="M3 3.5A1.5 1.5 0 0 1 4.5 2h11A1.5 1.5 0 0 1 17 3.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-11Zm2 1.5v1.5h10V5H5Zm0 3v1.5h10V8H5Zm0 3v1.5h10v-1.5H5Z" />
-        </svg>
-        <span class="text-xs font-bold">总览</span>
-      </button>
-    </nav>
-  </footer>
-
-  <!-- FAB Menu Popup -->
-  @if(isFabMenuOpen()) {
-    <div class="fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col-reverse items-center gap-3 animate-fade-in-down z-40">
-        <button (click)="openNewPostPanel()" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-slate-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
-            <span class="text-xl">📝</span>
-            <span>写点东西</span>
-        </button>
-        <button (click)="quickSend('meeting')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-green-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
-            <span class="text-xl">📅</span>
-            <span>开个会</span>
-        </button>
-        <button (click)="quickSend('help')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-sky-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
-            <span class="text-xl">🙋</span>
-            <span>求帮助</span>
-        </button>
-        <button (click)="quickSend('care')" class="w-32 justify-center whitespace-nowrap flex items-center gap-2 bg-white text-rose-700 px-4 py-2 rounded-full shadow-lg font-semibold transform transition-all hover:scale-105 active:scale-95">
-            <span class="text-xl">🤒</span>
-            <span>求关心</span>
-        </button>
-    </div>
+    }
   }
 </div>
