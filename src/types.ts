@@ -5,7 +5,8 @@ export type PostType =
   | 'TASK'
   | 'APPOINTMENT'
   | 'EVENT'
-  | 'MEDICATION';
+  | 'MEDICATION'
+  | 'MEAL_SUGGESTION';
 export type NeedStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type Priority = 'URGENT' | 'NORMAL' | 'LOW';
 export type ReactionType = 'GOT_IT' | 'ILL_DO_IT' | 'ILL_JOIN';
@@ -26,11 +27,17 @@ export interface Comment {
 export interface Assignee {
   name: string;
   avatar: string;
+  age?: number;
 }
 
 export interface Reaction {
   author: Assignee;
   type: ReactionType;
+}
+
+export interface AiSuggestion {
+  id: number;
+  content: string;
 }
 
 export interface Post {
@@ -48,4 +55,35 @@ export interface Post {
   reactions: Reaction[];
   comments: Comment[];
   subject?: Assignee;
+  aiSuggestions?: AiSuggestion[];
+  activeAiSuggestionIndex?: number;
+  isLoadingAiSuggestion?: boolean;
+}
+
+// --- New Types for Inventory Management ---
+
+export type InventoryCategory = '食材' | '清洁用品' | '生活用品';
+export type InventoryStatus = 'IN_STOCK' | 'RUNNING_LOW' | 'OUT_OF_STOCK';
+
+export interface InventoryItem {
+  id: number;
+  name: string;
+  image: string;
+  category: InventoryCategory;
+  brand?: string;
+  store?: string;
+  notes?: string;
+  status: InventoryStatus;
+}
+
+// --- New Types for Health Logging ---
+
+export type Mood = '不错' | '充沛' | '疲惫' | '压力大';
+
+export interface HealthLog {
+  id: number;
+  author: string;
+  timestamp: string;
+  content: string;
+  mood?: Mood;
 }

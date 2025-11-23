@@ -1,6 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Post, Assignee, ReactionType, Comment, NeedStatus } from './types';
+import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog } from './types';
 import { of, Observable, throwError } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 
@@ -11,6 +11,20 @@ const API_BASE_URL = '/api'; // Placeholder for real API base URL
 // -------------------
 
 const MOCK_POSTS: Post[] = [
+    {
+     id: 9,
+     author: '我',
+     authorAvatar: 'https://picsum.photos/seed/me/100/100',
+     timestamp: '2分钟前',
+     type: 'MEAL_SUGGESTION',
+     content: '大家晚上想吃什么？',
+     assignees: [],
+     reactions: [],
+     comments: [
+        { id: 10, author: '妈妈', authorAvatar: 'https://picsum.photos/seed/mom/100/100', content: '我都可以，但最好是低糖的。', timestamp: '1分钟前' },
+        { id: 11, author: '爸爸', authorAvatar: 'https://picsum.photos/seed/dad/100/100', content: '我胃有点不舒服，想吃点软的、好消化的，比如粥。', timestamp: '1分钟前' },
+     ],
+   },
     {
      id: 8,
      author: '我',
@@ -120,6 +134,24 @@ const MOCK_POSTS: Post[] = [
    },
  ];
 
+ const MOCK_INVENTORY_ITEMS: InventoryItem[] = [
+    { id: 101, name: '有机全脂牛奶', image: 'https://picsum.photos/seed/milk/200/200', category: '食材', brand: 'Organic Valley', store: 'Costco', notes: '买大包装的，孩子们喜欢喝。', status: 'IN_STOCK' },
+    { id: 102, name: '无麸质面包', image: 'https://picsum.photos/seed/bread/200/200', category: '食材', brand: 'Canyon Bakehouse', store: 'Whole Foods', notes: '切片款', status: 'RUNNING_LOW' },
+    { id: 103, name: '牛油果', image: 'https://picsum.photos/seed/avocado/200/200', category: '食材', store: 'Trader Joe\'s', notes: '一次买4个的网袋装。', status: 'IN_STOCK' },
+    { id: 104, name: '浓缩洗衣液', image: 'https://picsum.photos/seed/laundry/200/200', category: '清洁用品', brand: 'Tide', store: 'Amazon', notes: '订阅购买，每两个月送一次。', status: 'OUT_OF_STOCK' },
+    { id: 105, name: '洗碗块', image: 'https://picsum.photos/seed/dish/200/200', category: '清洁用品', brand: 'Cascade', store: 'Costco', status: 'RUNNING_LOW' },
+    { id: 106, name: '厨房纸巾', image: 'https://picsum.photos/seed/paper/200/200', category: '生活用品', brand: 'Bounty', notes: '要选超强吸收的型号。', status: 'IN_STOCK' },
+    { id: 107, name: '牙膏', image: 'https://picsum.photos/seed/paste/200/200', category: '生活用品', brand: 'Colgate', store: 'Target', status: 'IN_STOCK' },
+    { id: 108, name: '小米', image: 'https://picsum.photos/seed/millet/200/200', category: '食材', status: 'IN_STOCK' },
+    { id: 109, name: '南瓜', image: 'https://picsum.photos/seed/pumpkin/200/200', category: '食材', status: 'IN_STOCK' },
+ ];
+ 
+ const MOCK_HEALTH_LOGS: HealthLog[] = [
+  { id: 1, author: '我', timestamp: '今天 08:30', content: '感觉精力充沛', mood: '充沛' },
+  { id: 2, author: '我', timestamp: '昨天 21:00', content: '晚上有点头痛，可能是没休息好。', mood: '疲惫' },
+  { id: 3, author: '我', timestamp: '3天前', content: '心情不错', mood: '不错' },
+];
+
 @Injectable({
   providedIn: 'root'
 })
@@ -127,10 +159,14 @@ export class DataService {
     private http = inject(HttpClient);
     
     posts = signal<Post[]>([]);
+    inventory = signal<InventoryItem[]>([]);
+    healthLogs = signal<HealthLog[]>([]);
 
     constructor() {
         if(USE_MOCK_API) {
-            this.posts.set(MOCK_POSTS);
+            this.posts.set(MOCK_POSTS); // Display in chronological order
+            this.inventory.set(MOCK_INVENTORY_ITEMS);
+            this.healthLogs.set(MOCK_HEALTH_LOGS);
         }
     }
 
@@ -151,13 +187,13 @@ export class DataService {
         const newPostWithId: Post = { ...postData, id: Date.now() };
 
         if (USE_MOCK_API) {
-            this.posts.update(currentPosts => [newPostWithId, ...currentPosts]);
+            this.posts.update(currentPosts => [...currentPosts, newPostWithId]);
             return of(newPostWithId);
         }
 
         return this.http.post<Post>(`${API_BASE_URL}/posts`, newPostWithId).pipe(
             tap(createdPost => {
-                this.posts.update(currentPosts => [createdPost, ...currentPosts]);
+                this.posts.update(currentPosts => [...currentPosts, createdPost]);
             }),
             catchError(err => {
                 console.error('Failed to add post', err);
@@ -207,12 +243,12 @@ export class DataService {
       );
     }
 
-    addComment(postId: number, currentUser: Assignee): Observable<Post> {
+    addComment(postId: number, content: string, currentUser: Assignee): Observable<Post> {
         const newComment: Comment = {
             id: Date.now(),
             author: currentUser.name,
             authorAvatar: currentUser.avatar,
-            content: '好的，收到！', // Mock content
+            content: content,
             timestamp: '刚刚',
         };
 
@@ -221,7 +257,7 @@ export class DataService {
             this.posts.update((currentPosts) =>
                 currentPosts.map((post) => {
                     if (post.id === postId) {
-                        updatedPost = { ...post, comments: [...post.comments, newComment] };
+                        updatedPost = { ...post, comments: [ ...post.comments, newComment ] };
                         return updatedPost;
                     }
                     return post;
@@ -239,5 +275,167 @@ export class DataService {
                 return throwError(() => err);
             })
         );
+    }
+
+    markTaskAsDone(postId: number): Observable<Post> {
+      if (USE_MOCK_API) {
+        let updatedPost: Post | undefined;
+        this.posts.update((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id === postId) {
+              updatedPost = { ...post, status: 'DONE' };
+              return updatedPost;
+            }
+            return post;
+          })
+        );
+        return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
+      }
+      
+      return this.http.patch<Post>(`${API_BASE_URL}/posts/${postId}`, { status: 'DONE' }).pipe(
+        tap(post => {
+            this.posts.update(posts => posts.map(p => p.id === postId ? post : p));
+        }),
+        catchError(err => {
+            console.error('Failed to mark task as done', err);
+            return throwError(() => err);
+        })
+      );
+    }
+
+    // --- Health Log Methods ---
+    getHealthLogs(): Observable<HealthLog[]> {
+      if (USE_MOCK_API) {
+        return of(this.healthLogs());
+      }
+      return this.http.get<HealthLog[]>(`${API_BASE_URL}/health-logs`).pipe(
+        tap(logs => this.healthLogs.set(logs)),
+        catchError(err => {
+          console.error('Failed to fetch health logs', err);
+          return of([]);
+        })
+      );
+    }
+
+    addHealthLog(logData: Omit<HealthLog, 'id' | 'timestamp'>): Observable<HealthLog> {
+      const newLog: HealthLog = {
+        ...logData,
+        id: Date.now(),
+        timestamp: '刚刚',
+      };
+      
+      if (USE_MOCK_API) {
+        this.healthLogs.update(currentLogs => [newLog, ...currentLogs]);
+        return of(newLog);
+      }
+
+      return this.http.post<HealthLog>(`${API_BASE_URL}/health-logs`, newLog).pipe(
+        tap(createdLog => {
+          this.healthLogs.update(currentLogs => [createdLog, ...currentLogs]);
+        }),
+        catchError(err => {
+            console.error('Failed to add health log', err);
+            return throwError(() => err);
+        })
+      );
+    }
+
+    // --- Inventory Methods ---
+    getInventory(): Observable<InventoryItem[]> {
+      if (USE_MOCK_API) {
+        return of(this.inventory());
+      }
+      return this.http.get<InventoryItem[]>(`${API_BASE_URL}/inventory`).pipe(
+        tap(items => this.inventory.set(items)),
+        catchError(err => {
+          console.error('Failed to fetch inventory', err);
+          return of([]);
+        })
+      );
+    }
+
+    addInventoryItem(itemData: Omit<InventoryItem, 'id' | 'status'>): Observable<InventoryItem> {
+      const newItem: InventoryItem = {
+        ...itemData,
+        id: Date.now(),
+        status: 'IN_STOCK'
+      };
+      
+      if (USE_MOCK_API) {
+        this.inventory.update(currentItems => [newItem, ...currentItems]);
+        return of(newItem);
+      }
+
+      return this.http.post<InventoryItem>(`${API_BASE_URL}/inventory`, newItem).pipe(
+        tap(createdItem => {
+          this.inventory.update(currentItems => [createdItem, ...currentItems]);
+        }),
+        catchError(err => {
+            console.error('Failed to add inventory item', err);
+            return throwError(() => err);
+        })
+      );
+    }
+
+    updateInventoryItemStatus(itemId: number, status: InventoryStatus): Observable<InventoryItem> {
+      if (USE_MOCK_API) {
+        let updatedItem: InventoryItem | undefined;
+        this.inventory.update(currentItems =>
+          currentItems.map(item => {
+            if (item.id === itemId) {
+              updatedItem = { ...item, status };
+              return updatedItem;
+            }
+            return item;
+          })
+        );
+        return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
+      }
+
+      return this.http.patch<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}`, { status }).pipe(
+        tap(item => {
+          this.inventory.update(items => items.map(i => i.id === itemId ? item : i));
+        }),
+        catchError(err => {
+            console.error('Failed to update inventory item status', err);
+            return throwError(() => err);
+        })
+      );
+    }
+
+    // --- AI Methods ---
+    updatePostAiSuggestion(postId: number, data: { newSuggestion?: string; isLoading?: boolean; activeIndex?: number }): void {
+      if (USE_MOCK_API) {
+        this.posts.update((currentPosts) =>
+          currentPosts.map((post) => {
+            if (post.id === postId) {
+              const updatedPost = { ...post };
+    
+              if (typeof data.isLoading === 'boolean') {
+                updatedPost.isLoadingAiSuggestion = data.isLoading;
+              }
+    
+              if (typeof data.activeIndex === 'number') {
+                updatedPost.activeAiSuggestionIndex = data.activeIndex;
+              }
+    
+              if (data.newSuggestion) {
+                const newSuggestion: AiSuggestion = {
+                  id: Date.now(),
+                  content: data.newSuggestion,
+                };
+                if (!updatedPost.aiSuggestions) {
+                  updatedPost.aiSuggestions = [];
+                }
+                updatedPost.aiSuggestions.push(newSuggestion);
+                updatedPost.activeAiSuggestionIndex = updatedPost.aiSuggestions.length - 1;
+              }
+              
+              return updatedPost;
+            }
+            return post;
+          })
+        );
+      }
     }
 }

@@ -1,34 +1,40 @@
 import { Component, ChangeDetectionStrategy, signal, OnInit, OnDestroy, computed, ElementRef, viewChild, inject } from '@angular/core';
-import { NgOptimizedImage } from '@angular/common';
-// FIX: Replaced FormBuilder with FormGroup and FormControl to address the type inference issue.
+import { NgOptimizedImage, KeyValuePipe } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
+import { GoogleGenAI } from '@google/genai';
+import { marked } from 'marked';
 
-import { AuthService } from './auth.service';
+import { AuthService, FAMILY_MEMBERS } from './auth.service';
 import { DataService } from './data.service';
-import { Post, Assignee, ReactionType, PostType, NeedStatus, Priority } from './types';
+import { Post, Assignee, ReactionType, PostType, NeedStatus, Priority, InventoryItem, InventoryStatus, InventoryCategory, HealthLog, Mood } from './types';
 
-type ActiveTab = 'home' | 'overview';
+type ActiveTab = 'home' | 'inventory' | 'health' | 'profile';
 type ActiveHomeTab = 'all' | 'daily' | 'health' | 'knowledge';
 type PostCategory = 'daily' | 'health' | 'knowledge';
+interface QuickLogOption {
+  label: string;
+  mood?: Mood;
+  emoji: string;
+}
 
 @Component({
   selector: 'app-root',
-  imports: [NgOptimizedImage, ReactiveFormsModule],
+  imports: [NgOptimizedImage, ReactiveFormsModule, KeyValuePipe],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private dataService = inject(DataService);
-  // FIX: Removed FormBuilder injection as it was being incorrectly inferred as 'unknown' type.
-  // private fb = inject(FormBuilder);
+  private ai!: GoogleGenAI;
 
   // --- Auth & Data State ---
   loggedInUser = this.authService.currentUser;
   posts = this.dataService.posts;
+  inventory = this.dataService.inventory;
+  healthLogs = this.dataService.healthLogs;
   loginError = signal<string | null>(null);
 
-  // FIX: Initialized loginForm directly with FormGroup and FormControl to avoid using FormBuilder.
   loginForm = new FormGroup({
     username: new FormControl('', Validators.required),
     password: new FormControl('', Validators.required),
@@ -41,21 +47,58 @@ export class AppComponent implements OnInit, OnDestroy {
   now = signal(new Date());
   activeTab = signal<ActiveTab>('home');
   activeHomeTab = signal<ActiveHomeTab>('all');
-  navigationSource = signal<'direct' | 'overview'>('direct');
   
   isFabMenuOpen = signal(false);
   isNewPostPanelOpen = signal(false);
+  isNewItemPanelOpen = signal(false);
+  activeInventoryTab = signal<'stock' | 'shopping'>('stock');
   newPostContent = signal('');
   newPostCategory = signal<PostCategory>('daily');
 
+  newItemForm = new FormGroup({
+    name: new FormControl('', [Validators.required]),
+    category: new FormControl<InventoryCategory>('食材', [Validators.required]),
+    image: new FormControl('https://picsum.photos/seed/newitem/200/200'),
+    brand: new FormControl(''),
+    store: new FormControl(''),
+    notes: new FormControl(''),
+  });
+
+  quickLogOptions: QuickLogOption[] = [
+    { label: '心情不错', mood: '不错', emoji: '😊' },
+    { label: '精力充沛', mood: '充沛', emoji: '⚡️' },
+    { label: '有点疲惫', mood: '疲惫', emoji: '🥱' },
+    { label: '压力山大', mood: '压力大', emoji: '🤯' },
+    { label: '吃了药', emoji: '💊' },
+    { label: '运动了', emoji: '🏃' },
+    { label: '没睡好', mood: '疲惫', emoji: '😴' },
+  ];
+
+  newHealthLogForm = new FormGroup({
+    content: new FormControl('', [Validators.required]),
+    mood: new FormControl<Mood | undefined>(undefined),
+  });
+
+  // --- Commenting State ---
+  commentingOnPostId = signal<number | null>(null);
+  newCommentContent = signal('');
+
   mainNav = viewChild.required<ElementRef>('mainNav');
   stickyNotice = viewChild<ElementRef>('stickyNotice');
+
+  constructor() {
+    if (typeof process !== 'undefined' && process.env.API_KEY) {
+      this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+  }
 
   ngOnInit(): void {
     this.timer = window.setInterval(() => {
       this.now.set(new Date());
     }, 1000);
-    this.dataService.getPosts().subscribe(); // Initial fetch
+    this.dataService.getPosts().subscribe();
+    this.dataService.getInventory().subscribe();
+    this.dataService.getHealthLogs().subscribe();
   }
 
   ngOnDestroy(): void {
@@ -80,6 +123,7 @@ export class AppComponent implements OnInit, OnDestroy {
   logout(): void {
     this.authService.logout();
     this.loginForm.reset();
+    this.activeTab.set('home');
   }
 
   // --- UI Navigation & Interaction ---
@@ -110,54 +154,66 @@ export class AppComponent implements OnInit, OnDestroy {
       return !hasAcknowledged;
     });
   });
+  
+  urgentHealthPostIds = computed(() => {
+    return new Set(this.urgentHealthPosts().map(p => p.id));
+  });
 
   homePosts = computed(() => {
-    const urgentPostIds = new Set(this.urgentHealthPosts().map(p => p.id));
-    const regularPosts = this.posts().filter(p => !urgentPostIds.has(p.id));
+    const allPosts = this.posts();
 
     switch (this.activeHomeTab()) {
       case 'daily':
-        return regularPosts.filter(p => ['TASK', 'CHORE', 'APPOINTMENT'].includes(p.type));
+        return allPosts.filter(p => ['TASK', 'CHORE', 'APPOINTMENT', 'MEAL_SUGGESTION'].includes(p.type));
       case 'health':
-        return regularPosts.filter(p => ['FEELING', 'EVENT', 'MEDICATION'].includes(p.type));
+        return allPosts.filter(p => ['FEELING', 'EVENT', 'MEDICATION'].includes(p.type));
       case 'knowledge':
-        return regularPosts.filter(p => p.type === 'DISCOVERY');
+        return allPosts.filter(p => p.type === 'DISCOVERY');
       default:
-        return regularPosts;
+        return allPosts;
     }
   });
 
-  dailyPosts = computed(() => this.posts().filter(p => ['TASK', 'CHORE', 'APPOINTMENT'].includes(p.type)));
-  healthPosts = computed(() => this.posts().filter(p => ['FEELING', 'EVENT', 'MEDICATION'].includes(p.type)));
-  discoveries = computed(() => this.posts().filter(post => post.type === 'DISCOVERY'));
+  userHealthLogs = computed(() => {
+    const user = this.loggedInUser();
+    if (!user) return [];
+    return this.healthLogs().filter(log => log.author === user.name);
+  });
+
+  groupedInventory = computed(() => {
+    return this.inventory()
+      .filter(item => item.status === 'IN_STOCK')
+      .reduce((acc, item) => {
+      if (!acc[item.category]) {
+        acc[item.category] = [];
+      }
+      acc[item.category].push(item);
+      return acc;
+    }, {} as Record<InventoryCategory, InventoryItem[]>);
+  });
+
+  shoppingListItems = computed(() => {
+    return this.inventory()
+      .filter(item => item.status === 'RUNNING_LOW' || item.status === 'OUT_OF_STOCK')
+      .sort((a, b) => {
+        if (a.status === 'OUT_OF_STOCK' && b.status === 'RUNNING_LOW') return -1;
+        if (a.status === 'RUNNING_LOW' && b.status === 'OUT_OF_STOCK') return 1;
+        return 0;
+      });
+  });
 
   // --- Tab & Panel Management ---
   setActiveTab(tab: ActiveTab): void {
     this.activeTab.set(tab);
-    this.navigationSource.set('direct');
   }
   
   setActiveHomeTab(tab: ActiveHomeTab): void {
     this.activeHomeTab.set(tab);
-    this.navigationSource.set('direct');
   }
 
-  viewPostFromOverview(post: Post): void {
-    this.navigationSource.set('overview');
-    this.activeTab.set('home');
-
-    const postType = post.type;
-    if (['TASK', 'CHORE', 'APPOINTMENT'].includes(postType)) this.activeHomeTab.set('daily');
-    else if (['FEELING', 'EVENT', 'MEDICATION'].includes(postType)) this.activeHomeTab.set('health');
-    else if (postType === 'DISCOVERY') this.activeHomeTab.set('knowledge');
-    else this.activeHomeTab.set('all');
-
-    setTimeout(() => this.scrollToPost(post.id), 100); 
-  }
-
-  goBackToOverview(): void {
-    this.activeTab.set('overview');
-    this.navigationSource.set('direct');
+  viewInventory(tab: 'stock' | 'shopping'): void {
+    this.activeTab.set('inventory');
+    this.activeInventoryTab.set(tab);
   }
   
   toggleFabMenu(): void {
@@ -175,12 +231,29 @@ export class AppComponent implements OnInit, OnDestroy {
     this.newPostCategory.set('daily');
   }
   
+  openNewItemPanel(): void {
+    this.isFabMenuOpen.set(false);
+    this.isNewItemPanelOpen.set(true);
+  }
+  
+  closeNewItemPanel(): void {
+    this.isNewItemPanelOpen.set(false);
+    this.newItemForm.reset({
+      name: '',
+      category: '食材',
+      image: `https://picsum.photos/seed/${Date.now()}/200/200`,
+      brand: '',
+      store: '',
+      notes: '',
+    });
+  }
+
   onNewPostInput(event: Event): void {
     this.newPostContent.set((event.target as HTMLTextAreaElement).value);
   }
 
   // --- Data Modification Methods (via DataService) ---
-  quickSend(type: 'care' | 'help' | 'meeting'): void {
+  quickSend(type: 'care' | 'help' | 'meeting' | 'meal_suggestion'): void {
     const currentUser = this.loggedInUser();
     if (!currentUser) return;
 
@@ -199,6 +272,10 @@ export class AppComponent implements OnInit, OnDestroy {
       case 'meeting':
         targetTab = 'daily';
         newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'APPOINTMENT', content: '我们开个会讨论一下事情吧，大家什么时候有空？', status: 'TODO', priority: 'NORMAL', assignees: [], reactions: [], comments: [] };
+        break;
+      case 'meal_suggestion':
+        targetTab = 'daily';
+        newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'MEAL_SUGGESTION', content: '晚餐吃什么好呢？我没什么头绪，大家有什么想法吗？', assignees: [], reactions: [], comments: [] };
         break;
     }
 
@@ -245,19 +322,239 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  selectQuickLog(option: QuickLogOption): void {
+    this.newHealthLogForm.setValue({
+      content: option.label,
+      mood: option.mood ?? undefined,
+    });
+  }
+
+  onAddNewHealthLogSubmit(): void {
+    if (this.newHealthLogForm.invalid) return;
+
+    const currentUser = this.loggedInUser();
+    if (!currentUser) return;
+
+    const formValue = this.newHealthLogForm.value;
+    const newLog: Omit<HealthLog, 'id' | 'timestamp'> = {
+        author: currentUser.name,
+        content: formValue.content!,
+        mood: formValue.mood || undefined,
+    };
+    this.dataService.addHealthLog(newLog).subscribe(() => {
+        this.newHealthLogForm.reset({ content: '', mood: undefined });
+    });
+  }
+
   addReaction(postId: number, type: ReactionType): void {
     const currentUser = this.loggedInUser();
     if (!currentUser) return;
     this.dataService.addReaction(postId, type, currentUser).subscribe();
   }
 
-  addComment(postId: number): void {
+  toggleCommentInput(postId: number): void {
+    this.commentingOnPostId.update(currentId => currentId === postId ? null : postId);
+    this.newCommentContent.set('');
+  }
+
+  onCommentInput(event: Event): void {
+    this.newCommentContent.set((event.target as HTMLTextAreaElement).value);
+  }
+  
+  submitComment(postId: number): void {
     const currentUser = this.loggedInUser();
-    if (!currentUser) return;
-    this.dataService.addComment(postId, currentUser).subscribe();
+    const content = this.newCommentContent().trim();
+    if (!currentUser || !content) return;
+
+    this.dataService.addComment(postId, content, currentUser).subscribe(() => {
+        this.toggleCommentInput(postId);
+    });
+  }
+
+  markAsDone(postId: number): void {
+    this.dataService.markTaskAsDone(postId).subscribe();
+  }
+  
+  onAddNewItemSubmit(): void {
+    if (this.newItemForm.invalid) {
+      return;
+    }
+    const formValue = this.newItemForm.value;
+    const newItemData = {
+      name: formValue.name!,
+      category: formValue.category!,
+      image: formValue.image || `https://picsum.photos/seed/${formValue.name}/200/200`,
+      brand: formValue.brand || undefined,
+      store: formValue.store || undefined,
+      notes: formValue.notes || undefined,
+    };
+    this.dataService.addInventoryItem(newItemData).subscribe(() => {
+      this.closeNewItemPanel();
+    });
+  }
+
+  updateItemStatus(itemId: number, status: InventoryStatus): void {
+    this.dataService.updateInventoryItemStatus(itemId, status).subscribe();
+  }
+
+  markAsPurchased(itemId: number): void {
+    this.dataService.updateInventoryItemStatus(itemId, 'IN_STOCK').subscribe();
+  }
+
+  async getAiAnalysisForPost(post: Post): Promise<void> {
+    if (!this.ai) {
+      console.error("AI client not initialized.");
+      this.dataService.updatePostAiSuggestion(post.id, { newSuggestion: "AI 服务不可用，请检查 API Key。", isLoading: false });
+      return;
+    }
+  
+    this.dataService.updatePostAiSuggestion(post.id, { isLoading: true });
+  
+    const familyProfileString = FAMILY_MEMBERS.map(m => `- ${m.name} (年龄: ${m.age})`).join('\n');
+    const commentsString = post.comments.map(c => `- ${c.author}: "${c.content}"`).join('\n');
+    const initialRequest = post.content;
+  
+    let prompt = '';
+  
+    switch (post.type) {
+      case 'MEAL_SUGGESTION':
+        const inventoryString = this.inventory()
+          .filter(i => i.status === 'IN_STOCK' || i.status === 'RUNNING_LOW')
+          .map(i => `- ${i.name} (${i.brand ?? ''})`)
+          .join('\n');
+        prompt = `
+          You are a caring family nutritionist and expert home chef. Your role is to act as a mediator and create a harmonious meal plan by synthesizing a discussion from multiple family members.
+          ## Family Profile:
+          ${familyProfileString}
+          ## Current Home Inventory:
+          We have these items on hand:
+          ${inventoryString}
+          ## Family Meal Discussion:
+          The conversation started with this request: "${initialRequest}"
+          Here are the comments and preferences from other family members:
+          ${commentsString ? commentsString : "(No other comments were added.)"}
+          ## Your Task:
+          Based on all the information above, please synthesize the family's discussion and generate a complete, thoughtful meal plan that tries to satisfy everyone.
+          1.  **Analyze and Acknowledge all opinions** from the discussion.
+          2.  **Propose one or two dishes** that form a cohesive meal.
+          3.  **Strictly adhere to any absolute dietary restrictions** mentioned.
+          4.  **Prioritize using ingredients from the home inventory.**
+          5.  For each dish, provide a simple name, ingredients, and clear instructions.
+          6.  **Explain your reasoning clearly.** Start with a summary of how your proposed meal addresses the different requests.
+          7.  Format your entire response in clear, friendly, and well-structured Markdown.
+        `;
+        break;
+  
+      case 'TASK':
+      case 'CHORE':
+      case 'APPOINTMENT':
+        prompt = `
+          You are a helpful and efficient family assistant. A family member has posted a task, chore, or appointment.
+          ## Family Profile:
+          ${familyProfileString}
+          ## The Request: "${initialRequest}"
+          ## Comments from others:
+          ${commentsString ? commentsString : "(No other comments were added.)"}
+          ## Your Task:
+          Analyze the request and provide practical, actionable advice.
+          1.  If it's a task, break it down into smaller, manageable steps.
+          2.  Suggest any tools or resources that might be helpful.
+          3.  Offer tips for completing it efficiently or making it more enjoyable.
+          4.  If it's an appointment, suggest things to prepare or remember.
+          5.  Keep your tone encouraging and supportive. Format as Markdown.
+        `;
+        break;
+  
+      case 'FEELING':
+      case 'EVENT':
+      case 'MEDICATION':
+        prompt = `
+          You are a caring and empathetic family health companion. A family member has shared a health-related update.
+          ## Family Member's Post: "${initialRequest}"
+          ## Your Task:
+          Your role is to offer supportive and comforting words.
+          1.  Acknowledge the post with empathy and care.
+          2.  Offer general, non-medical wellness suggestions (e.g., "希望你多休息", "记得多喝水", "需要聊聊我随时都在").
+          3.  **Crucially, DO NOT provide any medical advice, diagnosis, or treatment suggestions.**
+          4.  Keep your response concise, warm, and reassuring.
+          5.  At the end of your response, you **MUST** include the following disclaimer exactly as written, in Markdown.
+
+          ---
+
+          *免责声明：我是一个 AI 助手，不能提供医疗建议。请务必咨询专业医生。*
+        `;
+        break;
+  
+      case 'DISCOVERY':
+        prompt = `
+          You are a curious and knowledgeable enthusiast. A family member has shared a new discovery or a piece of knowledge.
+          ## The Discovery: "${initialRequest}"
+          ## Your Task:
+          Expand on this topic in an interesting and engaging way for a family audience.
+          1.  Provide 2-3 related fun facts or interesting details.
+          2.  You could explain the "why" or "how" behind the discovery in simple terms.
+          3.  Keep the tone light, fun, and easy to understand.
+          4.  Format your response in well-structured Markdown.
+        `;
+        break;
+  
+      default:
+        // Generic fallback, though we should have a case for all types.
+        prompt = `Analyze this family post: "${initialRequest}" and provide a helpful comment.`;
+        break;
+    }
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+      });
+      const rawSuggestion = response.text;
+      const htmlSuggestion = await marked.parse(rawSuggestion);
+      this.dataService.updatePostAiSuggestion(post.id, { newSuggestion: htmlSuggestion, isLoading: false });
+    } catch (error) {
+      console.error('Error getting AI analysis:', error);
+      const errorMessage = '抱歉，我在思考时遇到了点问题，请稍后再试。';
+      this.dataService.updatePostAiSuggestion(post.id, { newSuggestion: errorMessage, isLoading: false });
+    }
+  }
+
+  changeSuggestion(post: Post, direction: 'next' | 'prev'): void {
+    const suggestions = post.aiSuggestions;
+    if (!suggestions || suggestions.length <= 1) {
+      return;
+    }
+  
+    let currentIndex = post.activeAiSuggestionIndex ?? 0;
+    
+    if (direction === 'next') {
+      currentIndex++;
+      if (currentIndex >= suggestions.length) {
+        currentIndex = 0; // Loop around
+      }
+    } else { // 'prev'
+      currentIndex--;
+      if (currentIndex < 0) {
+        currentIndex = suggestions.length - 1; // Loop around
+      }
+    }
+    
+    this.dataService.updatePostAiSuggestion(post.id, { activeIndex: currentIndex });
   }
 
   // --- Template Helper Methods ---
+  isUserInvolved(post: Post): boolean {
+    const user = this.loggedInUser();
+    if (!user) return false;
+    const isAssignee = post.assignees.some(a => a.name === user.name);
+    const hasReactedToDo = post.reactions.some(r => r.author.name === user.name && (r.type === 'ILL_DO_IT' || r.type === 'ILL_JOIN'));
+    return isAssignee || hasReactedToDo;
+  }
+  
+  isDarkCard(postType: PostType): boolean {
+    return ['DISCOVERY', 'CHORE', 'TASK', 'APPOINTMENT', 'MEAL_SUGGESTION'].includes(postType);
+  }
+
   getCountdown(dueDateString: string | undefined): string | null {
     if (!dueDateString) return null;
     const diff = new Date(dueDateString).getTime() - this.now().getTime();
@@ -283,6 +580,8 @@ export class AppComponent implements OnInit, OnDestroy {
         return { ...baseConfig, icon: '💡', title: '知识分享', bubbleClasses: 'bg-purple-600 text-white', headerTextClasses: 'text-white', bodyTextClasses: 'text-purple-50', separatorBorderClasses: 'border-white/20', reactionButtonClasses: 'bg-white/20 hover:bg-white/30 text-white', assigneeRingClasses: 'ring-purple-600', countdownClasses: 'text-purple-200', timestampClasses: 'text-purple-200', colorClasses: 'bg-purple-50 border-purple-200 text-purple-800', priorityChipClasses: () => 'bg-white/20 text-white', statusChipClasses: () => 'bg-white/20 text-white' };
       case 'CHORE': case 'TASK': case 'APPOINTMENT':
         return { ...baseConfig, icon: '📝', title: '家庭日常', bubbleClasses: 'bg-sky-500 text-white', headerTextClasses: 'text-white', bodyTextClasses: 'text-sky-50', separatorBorderClasses: 'border-white/20', reactionButtonClasses: 'bg-white/20 hover:bg-white/30 text-white', assigneeRingClasses: 'ring-sky-500', countdownClasses: 'text-rose-200', timestampClasses: 'text-sky-200', colorClasses: 'bg-sky-50 border-sky-200 text-sky-800', priorityChipClasses: () => 'bg-white/20 text-white', statusChipClasses: () => 'bg-white/20 text-white' };
+      case 'MEAL_SUGGESTION':
+        return { ...baseConfig, icon: '🍲', title: '吃点什么？', bubbleClasses: 'bg-amber-500 text-white', headerTextClasses: 'text-white', bodyTextClasses: 'text-amber-50', separatorBorderClasses: 'border-white/20', reactionButtonClasses: 'bg-white/20 hover:bg-white/30 text-white', assigneeRingClasses: 'ring-amber-500', countdownClasses: 'text-amber-200', timestampClasses: 'text-amber-200', colorClasses: 'bg-amber-50 border-amber-200 text-amber-800', priorityChipClasses: () => 'bg-white/20 text-white', statusChipClasses: () => 'bg-white/20 text-white' };
     }
   }
 
@@ -318,5 +617,13 @@ export class AppComponent implements OnInit, OnDestroy {
     const user = this.loggedInUser();
     if (!user) return false;
     return post.reactions.some(r => r.author.name === user.name && r.type === type);
+  }
+
+  getInventoryStatusConfig(status: InventoryStatus) {
+    switch (status) {
+      case 'IN_STOCK': return { text: '充足', color: 'bg-emerald-500', buttonClasses: 'bg-emerald-100 text-emerald-800' };
+      case 'RUNNING_LOW': return { text: '快用完了', color: 'bg-amber-500', buttonClasses: 'bg-amber-100 text-amber-800' };
+      case 'OUT_OF_STOCK': return { text: '已用完', color: 'bg-rose-500', buttonClasses: 'bg-rose-100 text-rose-800' };
+    }
   }
 }

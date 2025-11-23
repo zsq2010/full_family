@@ -9,10 +9,10 @@ const DEFAULT_DEV_USER = 'me';
 // --------------------
 
 export const FAMILY_MEMBERS: Assignee[] = [
-  { name: '我', avatar: 'https://picsum.photos/seed/me/100/100' },
-  { name: '妈妈', avatar: 'https://picsum.photos/seed/mom/100/100' },
-  { name: '爸爸', avatar: 'https://picsum.photos/seed/dad/100/100' },
-  { name: '亚历克斯', avatar: 'https://picsum.photos/seed/alex/100/100' },
+  { name: '我', avatar: 'https://picsum.photos/seed/me/100/100', age: 25 },
+  { name: '妈妈', avatar: 'https://picsum.photos/seed/mom/100/100', age: 49 },
+  { name: '爸爸', avatar: 'https://picsum.photos/seed/dad/100/100', age: 52 },
+  { name: '亚历克斯', avatar: 'https://picsum.photos/seed/alex/100/100', age: 18 },
 ];
 
 // Mock user credentials. Usernames are for login, names are for display.
