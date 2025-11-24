@@ -80,10 +80,39 @@ export interface InventoryItem {
 
 export type Mood = '不错' | '充沛' | '疲惫' | '压力大';
 
+export interface WeatherInfo {
+  temperature: number;
+  humidity: number;
+  weatherCode: number;
+}
+
+export interface AirQualityInfo {
+  aqi?: number;
+  pm2_5?: number;
+  pm10?: number;
+  carbonMonoxide?: number;
+  nitrogenDioxide?: number;
+  sulphurDioxide?: number;
+  ozone?: number;
+}
+
+export interface LocationInfo {
+  latitude: number;
+  longitude: number;
+  name?: string | null;
+}
+
+export interface EnvironmentalContext {
+  weather: WeatherInfo;
+  airQuality: AirQualityInfo;
+  location?: LocationInfo;
+}
+
 export interface HealthLog {
   id: number;
   author: string;
   timestamp: string;
   content: string;
   mood?: Mood;
+  environmentalContext?: EnvironmentalContext;
 }

@@ -1,8 +1,9 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog } from './types';
-import { of, Observable, throwError } from 'rxjs';
-import { tap, catchError } from 'rxjs/operators';
+import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo } from './types';
+import { of, Observable, throwError, forkJoin } from 'rxjs';
+// FIX: Changed RxJS operator import path from 'rxjs' to 'rxjs/operators' to resolve HttpClient type inference issues.
+import { tap, catchError, map, switchMap } from 'rxjs/operators';
 
 // --- Configuration ---
 // Set to `false` to use the real API (placeholder).
@@ -147,9 +148,31 @@ const MOCK_POSTS: Post[] = [
  ];
  
  const MOCK_HEALTH_LOGS: HealthLog[] = [
-  { id: 1, author: '我', timestamp: '今天 08:30', content: '感觉精力充沛', mood: '充沛' },
+  { 
+    id: 1, 
+    author: '我', 
+    timestamp: '今天 08:30', 
+    content: '感觉精力充沛', 
+    mood: '充沛',
+    environmentalContext: {
+      weather: { temperature: 28, humidity: 70, weatherCode: 1 },
+      airQuality: { aqi: 45, pm2_5: 12.1, pm10: 40.3, carbonMonoxide: 300.1, nitrogenDioxide: 15.2, sulphurDioxide: 2.6, ozone: 80.4 },
+      location: { latitude: 39.9042, longitude: 116.4074, name: '北京市, 中国' }
+    }
+  },
   { id: 2, author: '我', timestamp: '昨天 21:00', content: '晚上有点头痛，可能是没休息好。', mood: '疲惫' },
-  { id: 3, author: '我', timestamp: '3天前', content: '心情不错', mood: '不错' },
+  { 
+    id: 3, 
+    author: '我', 
+    timestamp: '3天前', 
+    content: '心情不错', 
+    mood: '不错',
+    environmentalContext: {
+      weather: { temperature: 22, humidity: 65, weatherCode: 3 },
+      airQuality: { aqi: 78, pm2_5: 25.1, pm10: 55.3, carbonMonoxide: 800.1, nitrogenDioxide: 30.2, sulphurDioxide: 5.6, ozone: 70.4 },
+      location: { latitude: 39.9042, longitude: 116.4074, name: '北京市, 中国' }
+    }
+  },
 ];
 
 @Injectable({
@@ -303,6 +326,102 @@ export class DataService {
       );
     }
 
+    // --- Environment Data Methods ---
+    private getUserLocation(): Observable<{ latitude: number; longitude: number }> {
+      return new Observable(observer => {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+          observer.error('Geolocation is not supported by your browser.');
+          return;
+        }
+    
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        };
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            observer.next({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+            observer.complete();
+          },
+          (error) => {
+            observer.error(error);
+          },
+          options
+        );
+      });
+    }
+
+    private getCurrentWeather(latitude: number, longitude: number): Observable<WeatherInfo> {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
+      // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
+      return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
+        map(response => ({
+          temperature: response.current.temperature_2m,
+          humidity: response.current.relative_humidity_2m,
+          weatherCode: response.current.weather_code,
+        }))
+      );
+    }
+    
+    private getCurrentAirQuality(latitude: number, longitude: number): Observable<AirQualityInfo> {
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
+      // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
+      return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
+        map(response => ({
+          aqi: response.current.us_aqi,
+          pm2_5: response.current.pm2_5,
+          pm10: response.current.pm10,
+          carbonMonoxide: response.current.carbon_monoxide,
+          nitrogenDioxide: response.current.nitrogen_dioxide,
+          sulphurDioxide: response.current.sulphur_dioxide,
+          ozone: response.current.ozone,
+        }))
+      );
+    }
+
+    private getLocationName(latitude: number, longitude: number): Observable<string | null> {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
+      // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
+      return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
+          map(response => {
+              if (response.results && response.results.length > 0) {
+                  const result = response.results[0];
+                  const parts = [result.name, result.admin1, result.country].filter(Boolean);
+                  return parts.join(', ');
+              }
+              return null;
+          }),
+          catchError(() => of(null))
+      );
+    }
+
+    public getEnvironmentalContext(): Observable<EnvironmentalContext> {
+        return this.getUserLocation().pipe(
+          switchMap(coords => 
+            forkJoin({
+              weather: this.getCurrentWeather(coords.latitude, coords.longitude),
+              airQuality: this.getCurrentAirQuality(coords.latitude, coords.longitude),
+              locationName: this.getLocationName(coords.latitude, coords.longitude)
+            }).pipe(
+              map(result => ({
+                weather: result.weather,
+                airQuality: result.airQuality,
+                location: {
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  name: result.locationName
+                }
+              }))
+            )
+          )
+        );
+    }
+
     // --- Health Log Methods ---
     getHealthLogs(): Observable<HealthLog[]> {
       if (USE_MOCK_API) {
@@ -318,26 +437,27 @@ export class DataService {
     }
 
     addHealthLog(logData: Omit<HealthLog, 'id' | 'timestamp'>): Observable<HealthLog> {
-      const newLog: HealthLog = {
-        ...logData,
-        id: Date.now(),
-        timestamp: '刚刚',
-      };
-      
-      if (USE_MOCK_API) {
-        this.healthLogs.update(currentLogs => [newLog, ...currentLogs]);
-        return of(newLog);
-      }
+        const newLog: HealthLog = {
+          ...logData,
+          id: Date.now(),
+          timestamp: '刚刚',
+        };
 
-      return this.http.post<HealthLog>(`${API_BASE_URL}/health-logs`, newLog).pipe(
-        tap(createdLog => {
-          this.healthLogs.update(currentLogs => [createdLog, ...currentLogs]);
-        }),
-        catchError(err => {
-            console.error('Failed to add health log', err);
-            return throwError(() => err);
-        })
-      );
+        if (USE_MOCK_API) {
+          this.healthLogs.update(currentLogs => [newLog, ...currentLogs]);
+          return of(newLog);
+        }
+    
+        // This would be the real API call path
+        return this.http.post<HealthLog>(`${API_BASE_URL}/health-logs`, newLog).pipe(
+          tap(createdLog => {
+            this.healthLogs.update(currentLogs => [createdLog, ...currentLogs]);
+          }),
+          catchError(err => {
+              console.error('Failed to add health log', err);
+              return throwError(() => err);
+          })
+        );
     }
 
     // --- Inventory Methods ---

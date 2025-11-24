@@ -1,5 +1,7 @@
 {
   "name": "家事 - 家庭关怀应用",
   "description": "一款家庭关怀与成长管家应用。它充当共享的家庭大脑，利用人工智能进行主动关怀。功能包括共享需求跟踪、健康和家务自动提醒以及家庭知识库。",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

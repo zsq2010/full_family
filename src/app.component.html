@@ -2,7 +2,7 @@
   @if (!loggedInUser()) {
     <!-- Login Screen -->
     <div class="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
-      <h1 class="text-3xl font-bold text-slate-700 mb-2">家事v1.0</h1>
+      <h1 class="text-3xl font-bold text-slate-700 mb-2">家事</h1>
       <p class="text-slate-500 mb-8">请使用您的账户登录</p>
       
       <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="w-full max-w-sm space-y-4">
@@ -337,7 +337,67 @@
         <main class="mt-6">
           <h2 class="text-2xl font-bold text-slate-800 text-center mb-2">健康日志</h2>
           <p class="text-slate-500 text-center mb-6">记录你的身心状态，更好地关爱自己。</p>
-      
+          
+          <!-- Environment Context Panel -->
+          <section class="mb-4">
+            <div class="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <div class="flex justify-between items-center">
+                <h3 class="text-sm font-bold text-slate-600">当前环境</h3>
+                @if (environmentState() !== 'idle') {
+                  <button (click)="fetchCurrentEnvironmentData()" [disabled]="environmentState() === 'loading'" class="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-50 disabled:cursor-wait transition-colors" aria-label="刷新环境数据">
+                    <svg [class.animate-spin]="environmentState() === 'loading'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-slate-500">
+                      <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201-4.42 5.5 5.5 0 0 1 10.842 2.162.75.75 0 0 1-1.49-.174.25.25 0 0 0-.493-.062c-.22.65-.54 1.253-.942 1.795a.75.75 0 0 1-1.054.093Z" clip-rule="evenodd" />
+                      <path fill-rule="evenodd" d="M4.688 8.576a5.5 5.5 0 0 1 9.201 4.42 5.5 5.5 0 0 1-10.842-2.162.75.75 0 0 1 1.49.174.25.25 0 0 0 .493.062c.22-.65.54-1.253.942-1.795a.75.75 0 0 1 1.054-.093ZM10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                }
+              </div>
+              
+              @switch (environmentState()) {
+                @case ('loading') {
+                  <div class="mt-2 text-center text-sm text-slate-500 p-2">
+                    <p>正在获取您的位置和环境数据...</p>
+                    <p class="text-xs text-slate-400">请在浏览器弹窗中选择“允许”。</p>
+                  </div>
+                }
+                @case ('error') {
+                  <div class="mt-2 text-center text-sm text-rose-600 bg-rose-50 p-2 rounded-lg">
+                    <p>{{ environmentDataError() }}</p>
+                  </div>
+                }
+                @case ('success') {
+                  @if (currentEnvironmentalContext(); as context) {
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                      <div class="flex items-center gap-1.5" title="当前天气">
+                        <span class="text-lg">{{ getWeatherIcon(context.weather.weatherCode) }}</span>
+                        <span class="font-medium">{{ context.weather.temperature | number:'1.0-0' }}°C</span>
+                      </div>
+                      <div class="flex items-center gap-1.5" title="空气质量指数">
+                        @let aqiInfo = getAqiInfo(context.airQuality.aqi);
+                        <span [class]="'px-2 py-0.5 rounded-full font-semibold text-xs ' + aqiInfo.colorClasses">
+                          AQI {{ aqiInfo.text }} {{ context.airQuality.aqi | number:'1.0-0' }}
+                        </span>
+                      </div>
+                      @if (context.location) {
+                        <div class="flex items-center gap-1.5" title="当前位置">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 text-slate-400">
+                            <path d="M8 8.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" />
+                            <path d="M4.25 5.75a3.75 3.75 0 1 1 7.5 0c0 2.25-1.5 4.5-3.125 5.821a.75.75 0 0 1-1.25 0C5.75 10.25 4.25 8 4.25 5.75ZM8 1.5a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 0 0 0-8.5Z" />
+                          </svg>
+                          @if (context.location.name) {
+                            <span>{{ context.location.name }}</span>
+                          } @else {
+                            <span class="text-xs">坐标: {{ context.location.latitude | number:'1.2-2' }}, {{ context.location.longitude | number:'1.2-2' }}</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+              }
+            </div>
+          </section>
+
           <!-- New Unified Log Section -->
           <section class="mb-8">
             <form [formGroup]="newHealthLogForm" (ngSubmit)="onAddNewHealthLogSubmit()">
@@ -359,11 +419,19 @@
                   }
                 </div>
           
-                <button type="submit" [disabled]="newHealthLogForm.invalid" class="mt-4 w-full flex items-center justify-center gap-2 text-sm font-bold bg-sky-500 text-white py-2.5 rounded-lg hover:bg-sky-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                  </svg>
-                  <span>保存记录</span>
+                <button type="submit" [disabled]="newHealthLogForm.invalid || isSavingHealthLog()" class="mt-4 w-full flex items-center justify-center gap-2 text-sm font-bold bg-sky-500 text-white py-2.5 rounded-lg hover:bg-sky-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed">
+                  @if (isSavingHealthLog()) {
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>正在保存...</span>
+                  } @else {
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                      <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                    </svg>
+                    <span>保存记录</span>
+                  }
                 </button>
               </div>
             </form>
@@ -375,8 +443,8 @@
             @if (userHealthLogs().length > 0) {
               <div class="space-y-3">
                 @for (log of userHealthLogs(); track log.id) {
-                  <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex items-center gap-4 animate-fade-in-down">
-                    <span class="text-2xl h-10 w-10 flex items-center justify-center bg-slate-100 rounded-full">
+                  <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex items-start gap-4 animate-fade-in-down">
+                    <span class="text-2xl h-10 w-10 flex items-center justify-center bg-slate-100 rounded-full flex-shrink-0">
                       @switch (log.mood) {
                         @case ('不错') { <span class="text-xl">😊</span> }
                         @case ('充沛') { <span class="text-xl">⚡️</span> }
@@ -388,6 +456,40 @@
                     <div class="flex-1">
                       <p class="font-medium text-slate-800">{{ log.content }}</p>
                       <p class="text-xs text-slate-400 mt-1">{{ log.timestamp }}</p>
+                      @if (log.environmentalContext) {
+                        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 border-t border-slate-100 pt-2">
+                           <div class="flex items-center gap-1.5" title="当时天气">
+                              <span class="text-base">{{ getWeatherIcon(log.environmentalContext.weather.weatherCode) }}</span>
+                              <span class="font-medium">{{ log.environmentalContext.weather.temperature | number:'1.0-0' }}°C</span>
+                            </div>
+                            <div class="flex items-center gap-1.5" title="空气质量指数">
+                              @let aqiInfo = getAqiInfo(log.environmentalContext.airQuality.aqi);
+                              <span [class]="'px-2 py-0.5 rounded-full font-semibold ' + aqiInfo.colorClasses">
+                                AQI {{ aqiInfo.text }} {{ log.environmentalContext.airQuality.aqi | number:'1.0-0' }}
+                              </span>
+                            </div>
+                            <div class="flex items-center gap-1.5" title="空气湿度">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 text-sky-400">
+                                <path d="M4.03 3.3a.75.75 0 0 0-1.06 1.06l.22.22c-1.3 1.583-1.803 3.57-1.34 5.485.462 1.914 2.14 3.398 4.15 3.635a.75.75 0 0 0 0-1.5c-1.373-.16-2.542-1.2-2.88-2.582-.337-1.38.04-2.813.92-3.95l.22.22a.75.75 0 0 0 1.06-1.06l-1.3-1.3Z" />
+                                <path d="M12.47 3.3a.75.75 0 0 1 1.06 1.06l-.22.22c1.3 1.583 1.803 3.57 1.34 5.485-.462 1.914-2.14 3.398-4.15 3.635a.75.75 0 0 1 0-1.5c1.373-.16 2.542-1.2 2.88-2.582.337-1.38-.04-2.813-.92-3.95l-.22.22a.75.75 0 0 1-1.06-1.06l1.3-1.3Z" />
+                              </svg>
+                              <span>{{ log.environmentalContext.weather.humidity | number:'1.0-0' }}%</span>
+                            </div>
+                            @if (log.environmentalContext.location) {
+                              <div class="flex items-center gap-1.5" title="记录地点">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 text-slate-400">
+                                  <path d="M8 8.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z" />
+                                  <path d="M4.25 5.75a3.75 3.75 0 1 1 7.5 0c0 2.25-1.5 4.5-3.125 5.821a.75.75 0 0 1-1.25 0C5.75 10.25 4.25 8 4.25 5.75ZM8 1.5a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 0 0 0-8.5Z" />
+                                </svg>
+                                @if (log.environmentalContext.location.name) {
+                                  <span>{{ log.environmentalContext.location.name }}</span>
+                                } @else {
+                                  <span class="text-xs">坐标: {{ log.environmentalContext.location.latitude | number:'1.2-2' }}, {{ log.environmentalContext.location.longitude | number:'1.2-2' }}</span>
+                                }
+                              </div>
+                            }
+                        </div>
+                      }
                     </div>
                   </div>
                 }
