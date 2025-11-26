@@ -4,9 +4,15 @@ import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angula
 import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
 
+import { API_KEY } from './config';
 import { AuthService, FAMILY_MEMBERS } from './auth.service';
 import { DataService } from './data.service';
 import { Post, Assignee, ReactionType, PostType, NeedStatus, Priority, InventoryItem, InventoryStatus, InventoryCategory, HealthLog, Mood, EnvironmentalContext } from './types';
+
+// --- AI 配置 ---
+// API 密钥现在于 src/config.ts 文件中配置。
+// -----------------
+
 
 type ActiveTab = 'home' | 'inventory' | 'health' | 'profile';
 type ActiveHomeTab = 'all' | 'daily' | 'health' | 'knowledge';
@@ -94,8 +100,10 @@ export class AppComponent implements OnInit, OnDestroy {
   stickyNotice = viewChild<ElementRef>('stickyNotice');
 
   constructor() {
-    if (typeof process !== 'undefined' && process.env.API_KEY) {
-      this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    if (API_KEY && API_KEY !== "YOUR_API_KEY_HERE") {
+      this.ai = new GoogleGenAI({ apiKey: API_KEY });
+    } else {
+      console.warn("Google Gemini API key not found. Please add it to src/config.ts. AI features will be disabled.");
     }
   }
 
@@ -453,7 +461,7 @@ export class AppComponent implements OnInit, OnDestroy {
   async getAiAnalysisForPost(post: Post): Promise<void> {
     if (!this.ai) {
       console.error("AI client not initialized.");
-      this.dataService.updatePostAiSuggestion(post.id, { newSuggestion: "AI 服务不可用，请检查 API Key。", isLoading: false });
+      this.dataService.updatePostAiSuggestion(post.id, { newSuggestion: "AI 服务不可用，请在 `src/config.ts` 中检查您的 API Key 配置。", isLoading: false });
       return;
     }
   

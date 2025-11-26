@@ -2,8 +2,8 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo } from './types';
 import { of, Observable, throwError, forkJoin } from 'rxjs';
-// FIX: Changed RxJS operator import path from 'rxjs' to 'rxjs/operators' to resolve HttpClient type inference issues.
-import { tap, catchError, map, switchMap } from 'rxjs/operators';
+// FIX: Corrected RxJS operator import path from 'rxjs/operators' to 'rxjs' for compatibility with modern RxJS versions.
+import { tap, catchError, map, switchMap } from 'rxjs';
 
 // --- Configuration ---
 // Set to `false` to use the real API (placeholder).
@@ -179,7 +179,10 @@ const MOCK_POSTS: Post[] = [
   providedIn: 'root'
 })
 export class DataService {
-    private http = inject(HttpClient);
+    // FIX: The `inject(HttpClient)` call was being inferred as `unknown` by the
+    // TypeScript compiler in this environment. Casting to `HttpClient` restores
+    // type information and resolves subsequent compilation errors.
+    private http = inject(HttpClient) as HttpClient;
     
     posts = signal<Post[]>([]);
     inventory = signal<InventoryItem[]>([]);
@@ -198,7 +201,8 @@ export class DataService {
             return of(this.posts());
         }
         return this.http.get<Post[]>(`${API_BASE_URL}/posts`).pipe(
-            tap(posts => this.posts.set(posts)),
+            // FIX: Explicitly type the 'posts' parameter to resolve TypeScript inference issue.
+            tap((posts: Post[]) => this.posts.set(posts)),
             catchError(err => {
                 console.error('Failed to fetch posts', err);
                 return of([]); // Return empty array on error
@@ -210,12 +214,13 @@ export class DataService {
         const newPostWithId: Post = { ...postData, id: Date.now() };
 
         if (USE_MOCK_API) {
-            this.posts.update(currentPosts => [...currentPosts, newPostWithId]);
+            this.posts.update(currentPosts => [newPostWithId, ...currentPosts].sort((a,b) => b.id - a.id));
             return of(newPostWithId);
         }
 
         return this.http.post<Post>(`${API_BASE_URL}/posts`, newPostWithId).pipe(
-            tap(createdPost => {
+            // FIX: Explicitly type the 'createdPost' parameter to resolve TypeScript inference issue.
+            tap((createdPost: Post) => {
                 this.posts.update(currentPosts => [...currentPosts, createdPost]);
             }),
             catchError(err => {
@@ -256,7 +261,8 @@ export class DataService {
       }
 
       return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/reactions`, { type, user: currentUser }).pipe(
-        tap(post => {
+        // FIX: Explicitly type the 'post' parameter to resolve TypeScript inference issue.
+        tap((post: Post) => {
             this.posts.update(posts => posts.map(p => p.id === postId ? post : p));
         }),
         catchError(err => {
@@ -290,7 +296,8 @@ export class DataService {
         }
 
         return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/comments`, { content: newComment.content }).pipe(
-            tap(post => {
+            // FIX: Explicitly type the 'post' parameter to resolve TypeScript inference issue.
+            tap((post: Post) => {
                 this.posts.update(posts => posts.map(p => p.id === postId ? post : p));
             }),
             catchError(err => {
@@ -316,7 +323,8 @@ export class DataService {
       }
       
       return this.http.patch<Post>(`${API_BASE_URL}/posts/${postId}`, { status: 'DONE' }).pipe(
-        tap(post => {
+        // FIX: Explicitly type the 'post' parameter to resolve TypeScript inference issue.
+        tap((post: Post) => {
             this.posts.update(posts => posts.map(p => p.id === postId ? post : p));
         }),
         catchError(err => {
@@ -360,7 +368,8 @@ export class DataService {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
       // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
       return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
-        map(response => ({
+        // FIX: Explicitly type the 'response' parameter to resolve TypeScript inference issue.
+        map((response: { current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }) => ({
           temperature: response.current.temperature_2m,
           humidity: response.current.relative_humidity_2m,
           weatherCode: response.current.weather_code,
@@ -372,7 +381,8 @@ export class DataService {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
       // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
       return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
-        map(response => ({
+        // FIX: Explicitly type the 'response' parameter to resolve TypeScript inference issue.
+        map((response: { current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }) => ({
           aqi: response.current.us_aqi,
           pm2_5: response.current.pm2_5,
           pm10: response.current.pm10,
@@ -388,7 +398,8 @@ export class DataService {
       const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
       // FIX: Replaced <any> with a specific type for the API response to ensure type safety.
       return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
-          map(response => {
+          // FIX: Explicitly type the 'response' parameter to resolve TypeScript inference issue.
+          map((response: { results?: { name: string; admin1: string; country: string; }[] }) => {
               if (response.results && response.results.length > 0) {
                   const result = response.results[0];
                   const parts = [result.name, result.admin1, result.country].filter(Boolean);
@@ -428,7 +439,8 @@ export class DataService {
         return of(this.healthLogs());
       }
       return this.http.get<HealthLog[]>(`${API_BASE_URL}/health-logs`).pipe(
-        tap(logs => this.healthLogs.set(logs)),
+        // FIX: Explicitly type the 'logs' parameter to resolve TypeScript inference issue.
+        tap((logs: HealthLog[]) => this.healthLogs.set(logs)),
         catchError(err => {
           console.error('Failed to fetch health logs', err);
           return of([]);
@@ -450,7 +462,8 @@ export class DataService {
     
         // This would be the real API call path
         return this.http.post<HealthLog>(`${API_BASE_URL}/health-logs`, newLog).pipe(
-          tap(createdLog => {
+          // FIX: Explicitly type the 'createdLog' parameter to resolve TypeScript inference issue.
+          tap((createdLog: HealthLog) => {
             this.healthLogs.update(currentLogs => [createdLog, ...currentLogs]);
           }),
           catchError(err => {
@@ -466,7 +479,8 @@ export class DataService {
         return of(this.inventory());
       }
       return this.http.get<InventoryItem[]>(`${API_BASE_URL}/inventory`).pipe(
-        tap(items => this.inventory.set(items)),
+        // FIX: Explicitly type the 'items' parameter to resolve TypeScript inference issue.
+        tap((items: InventoryItem[]) => this.inventory.set(items)),
         catchError(err => {
           console.error('Failed to fetch inventory', err);
           return of([]);
@@ -487,7 +501,8 @@ export class DataService {
       }
 
       return this.http.post<InventoryItem>(`${API_BASE_URL}/inventory`, newItem).pipe(
-        tap(createdItem => {
+        // FIX: Explicitly type the 'createdItem' parameter to resolve TypeScript inference issue.
+        tap((createdItem: InventoryItem) => {
           this.inventory.update(currentItems => [createdItem, ...currentItems]);
         }),
         catchError(err => {
@@ -513,7 +528,8 @@ export class DataService {
       }
 
       return this.http.patch<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}`, { status }).pipe(
-        tap(item => {
+        // FIX: Explicitly type the 'item' parameter to resolve TypeScript inference issue.
+        tap((item: InventoryItem) => {
           this.inventory.update(items => items.map(i => i.id === itemId ? item : i));
         }),
         catchError(err => {

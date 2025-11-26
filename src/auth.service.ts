@@ -1,11 +1,9 @@
 import { Injectable, signal } from '@angular/core';
 import { Assignee } from './types';
+import { DEV_AUTO_LOGIN, DEV_DEFAULT_USER } from './config';
 
 // --- 开发配置 ---
-// 设置为 true 可在应用启动时自动登录，跳过登录界面，方便测试。
-const AUTO_LOGIN_FOR_DEVELOPMENT = true;
-// 在自动登录时使用的默认用户名 (可选值: 'me', 'mom', 'dad', 'alex')。
-const DEFAULT_DEV_USER = 'me';
+// 配置已移至 src/config.ts
 // --------------------
 
 export const FAMILY_MEMBERS: Assignee[] = [
@@ -31,8 +29,9 @@ export class AuthService {
   currentUser = signal<Assignee | null>(null);
 
   constructor() {
-    if (AUTO_LOGIN_FOR_DEVELOPMENT) {
-      const devUser = USERS.get(DEFAULT_DEV_USER);
+    // Read auto-login settings from the config file.
+    if (DEV_AUTO_LOGIN) {
+      const devUser = USERS.get(DEV_DEFAULT_USER);
       if (devUser) {
         this.currentUser.set(devUser.user);
       }
