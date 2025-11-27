@@ -1,5 +1,7 @@
+
+
 import { Component, ChangeDetectionStrategy, signal, OnInit, OnDestroy, computed, ElementRef, viewChild, inject, effect } from '@angular/core';
-import { NgOptimizedImage, KeyValuePipe, DecimalPipe } from '@angular/common';
+import { NgOptimizedImage, DecimalPipe, DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
@@ -26,7 +28,7 @@ type EnvironmentState = 'idle' | 'loading' | 'success' | 'error';
 
 @Component({
   selector: 'app-root',
-  imports: [NgOptimizedImage, ReactiveFormsModule, KeyValuePipe, DecimalPipe],
+  imports: [NgOptimizedImage, ReactiveFormsModule, DecimalPipe, DatePipe],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -59,6 +61,7 @@ export class AppComponent implements OnInit, OnDestroy {
   isFabMenuOpen = signal(false);
   isNewPostPanelOpen = signal(false);
   isNewItemPanelOpen = signal(false);
+  editingItemId = signal<number | null>(null);
   activeInventoryTab = signal<'stock' | 'shopping'>('stock');
   newPostContent = signal('');
   newPostCategory = signal<PostCategory>('daily');
@@ -76,6 +79,7 @@ export class AppComponent implements OnInit, OnDestroy {
     brand: new FormControl(''),
     store: new FormControl(''),
     notes: new FormControl(''),
+    usageScenario: new FormControl(''),
   });
 
   quickLogOptions: QuickLogOption[] = [
@@ -96,6 +100,8 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Commenting State ---
   commentingOnPostId = signal<number | null>(null);
   newCommentContent = signal('');
+  commentingOnItemId = signal<number | null>(null);
+  newInventoryCommentContent = signal('');
 
   mainNav = viewChild.required<ElementRef>('mainNav');
   stickyNotice = viewChild<ElementRef>('stickyNotice');
@@ -230,6 +236,10 @@ export class AppComponent implements OnInit, OnDestroy {
     }, {} as Record<InventoryCategory, InventoryItem[]>);
   });
 
+  inventoryCategories = computed(() => {
+    return Object.keys(this.groupedInventory()) as InventoryCategory[];
+  });
+
   shoppingListItems = computed(() => {
     return this.inventory()
       .filter(item => item.status === 'RUNNING_LOW' || item.status === 'OUT_OF_STOCK')
@@ -277,9 +287,24 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isFabMenuOpen.set(false);
     this.isNewItemPanelOpen.set(true);
   }
+
+  openEditItemPanel(item: InventoryItem): void {
+    this.editingItemId.set(item.id);
+    this.newItemForm.patchValue({
+      name: item.name,
+      category: item.category,
+      image: item.image,
+      brand: item.brand ?? '',
+      store: item.store ?? '',
+      notes: item.notes ?? '',
+      usageScenario: item.usageScenario ?? ''
+    });
+    this.isNewItemPanelOpen.set(true);
+  }
   
   closeNewItemPanel(): void {
     this.isNewItemPanelOpen.set(false);
+    this.editingItemId.set(null);
     this.newItemForm.reset({
       name: '',
       category: '食材',
@@ -287,6 +312,7 @@ export class AppComponent implements OnInit, OnDestroy {
       brand: '',
       store: '',
       notes: '',
+      usageScenario: '',
     });
   }
 
@@ -450,6 +476,12 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  deletePostComment(postId: number, commentId: number): void {
+    if (confirm('您确定要删除这条评论吗？')) {
+        this.dataService.deleteComment(postId, commentId).subscribe();
+    }
+  }
+
   markAsDone(postId: number): void {
     this.dataService.markTaskAsDone(postId).subscribe();
   }
@@ -459,17 +491,32 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     const formValue = this.newItemForm.value;
-    const newItemData = {
+    const itemData = {
       name: formValue.name!,
       category: formValue.category!,
       image: formValue.image || `https://picsum.photos/seed/${formValue.name}/200/200`,
       brand: formValue.brand || undefined,
       store: formValue.store || undefined,
       notes: formValue.notes || undefined,
+      usageScenario: formValue.usageScenario || undefined,
     };
-    this.dataService.addInventoryItem(newItemData).subscribe(() => {
-      this.closeNewItemPanel();
-    });
+
+    const currentEditingId = this.editingItemId();
+    if (currentEditingId) {
+        this.dataService.updateInventoryItem(currentEditingId, itemData).subscribe(() => {
+            this.closeNewItemPanel();
+        });
+    } else {
+        this.dataService.addInventoryItem(itemData).subscribe(() => {
+            this.closeNewItemPanel();
+        });
+    }
+  }
+
+  deleteItem(itemId: number, itemName: string): void {
+    if (confirm(`您确定要删除 "${itemName}" 吗？此操作无法撤销。`)) {
+      this.dataService.deleteInventoryItem(itemId).subscribe();
+    }
   }
 
   updateItemStatus(itemId: number, status: InventoryStatus): void {
@@ -478,6 +525,31 @@ export class AppComponent implements OnInit, OnDestroy {
 
   markAsPurchased(itemId: number): void {
     this.dataService.updateInventoryItemStatus(itemId, 'IN_STOCK').subscribe();
+  }
+
+  toggleInventoryCommentInput(itemId: number): void {
+    this.commentingOnItemId.update(currentId => currentId === itemId ? null : itemId);
+    this.newInventoryCommentContent.set('');
+  }
+
+  onInventoryCommentInput(event: Event): void {
+      this.newInventoryCommentContent.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  submitInventoryComment(itemId: number): void {
+      const currentUser = this.loggedInUser();
+      const content = this.newInventoryCommentContent().trim();
+      if (!currentUser || !content) return;
+
+      this.dataService.addInventoryComment(itemId, content, currentUser).subscribe(() => {
+          this.toggleInventoryCommentInput(itemId);
+      });
+  }
+
+  deleteInventoryItemComment(itemId: number, commentId: number): void {
+    if (confirm('您确定要删除这条评论吗？')) {
+        this.dataService.deleteInventoryComment(itemId, commentId).subscribe();
+    }
   }
 
   async getAiAnalysisForPost(post: Post): Promise<void> {
@@ -584,6 +656,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     try {
+      // FIX: Use 'contents' instead of 'prompt' for the generateContent call, as per @google/genai guidelines.
       const response = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
@@ -704,6 +777,10 @@ export class AppComponent implements OnInit, OnDestroy {
       case 'RUNNING_LOW': return { text: '快用完了', color: 'bg-amber-500', buttonClasses: 'bg-amber-100 text-amber-800' };
       case 'OUT_OF_STOCK': return { text: '已用完', color: 'bg-rose-500', buttonClasses: 'bg-rose-100 text-rose-800' };
     }
+  }
+
+  getMoodEmoji(mood: Mood): string | undefined {
+    return this.quickLogOptions.find(o => o.mood === mood)?.emoji;
   }
 
   getWeatherIcon(code: number): string {

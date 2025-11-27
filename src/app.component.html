@@ -80,7 +80,11 @@
                     <div (click)="scrollToPost(post.id)" [class]="'px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm border-b cursor-pointer hover:bg-red-100/50 transition-colors ' + typeConfig.colorClasses" [class.border-red-300]="true">
                         <span [class]="typeConfig.iconClasses + ' text-lg'">{{ typeConfig.icon }}</span>
                         @if (post.subject) {
+                          @if ($first) {
+                            <img priority [ngSrc]="post.subject.avatar" [alt]="post.subject.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                          } @else {
                             <img [ngSrc]="post.subject.avatar" [alt]="post.subject.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                          }
                         }
                         <p class="font-semibold truncate flex-1">
                           {{ typeConfig.title }}: 
@@ -194,4 +198,580 @@
                               </button>
                           </div>
 
-                        } @else
+                        } @else {
+                          <div class="flex justify-end">
+                            <button (click)="getAiAnalysisForPost(post)" [class]="'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">
+                                <span>✨ AI 分析</span>
+                            </button>
+                          </div>
+                        }
+                      </div>
+
+                      <!-- Bubble Footer (Reactions, Assignees) -->
+                      <div [class]="'mt-4 pt-3 border-t ' + typeConfig.separatorBorderClasses">
+                        <div class="flex justify-between items-end">
+                          <!-- Reactions -->
+                          <div class="flex flex-col gap-2">
+                              @for(reactionType of reactionTypes; track reactionType) {
+                                @let reactors = getReactionsByType(post, reactionType);
+                                @if(reactors.length > 0) {
+                                  <div class="flex items-center gap-2">
+                                      <span class="text-sm font-bold w-20" [class.text-white]="isDarkCard(post.type)" [class.text-slate-600]="!isDarkCard(post.type)">
+                                          {{ getReactionConfig(reactionType).label }}
+                                      </span>
+                                      <div class="flex -space-x-2">
+                                          @for(reactor of reactors; track reactor.name) {
+                                              <img [ngSrc]="reactor.avatar" [alt]="reactor.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover ring-2" [class]="typeConfig.assigneeRingClasses">
+                                          }
+                                      </div>
+                                  </div>
+                                }
+                              }
+                          </div>
+                          <!-- Timestamp -->
+                          <span [class]="'text-xs font-medium ' + typeConfig.timestampClasses">{{ post.timestamp | date:'shortTime' }}</span>
+                        </div>
+                      </div>
+
+                      <!-- Action Buttons -->
+                      <div [class]="'mt-3 pt-3 border-t flex flex-wrap gap-2 ' + typeConfig.separatorBorderClasses">
+                        @if(!hasReacted(post, 'ILL_DO_IT')) {
+                          <button (click)="addReaction(post.id, 'ILL_DO_IT')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">我来做</button>
+                        }
+                        @if(!hasReacted(post, 'ILL_JOIN')) {
+                          <button (click)="addReaction(post.id, 'ILL_JOIN')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">我参加</button>
+                        }
+                        @if(!hasReacted(post, 'GOT_IT')) {
+                          <button (click)="addReaction(post.id, 'GOT_IT')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">收到</button>
+                        }
+                        <button (click)="toggleCommentInput(post.id)" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">
+                            回复
+                        </button>
+                        @if(isUserInvolved(post) && post.status !== 'DONE') {
+                           <button (click)="markAsDone(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-emerald-500/20 text-emerald-800 hover:bg-emerald-500/30">
+                              标记为完成
+                           </button>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Comments section -->
+                @if(post.comments.length > 0 || commentingOnPostId() === post.id) {
+                  <div class="mt-2 ml-12 w-[calc(100%-3rem)] space-y-2">
+                    @for (comment of post.comments; track comment.id) {
+                      <div class="flex items-start gap-2 animate-fade-in group">
+                          <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                          <div class="flex-1 text-sm bg-slate-100 px-3 py-2 rounded-lg rounded-tl-none">
+                              <p class="font-semibold text-slate-800">{{ comment.author }}</p>
+                              <p class="text-slate-600">{{ comment.content }}</p>
+                          </div>
+                          @if(comment.author === loggedInUser()!.name) {
+                            <button (click)="deletePostComment(post.id, comment.id)" class="p-1 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="删除评论">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          }
+                      </div>
+                    }
+                    @if (commentingOnPostId() === post.id) {
+                       <div class="flex items-start gap-2 animate-fade-in">
+                          <img [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                          <div class="flex-1 space-y-2">
+                            <textarea [value]="newCommentContent()" (input)="onCommentInput($event)" rows="2" placeholder="写下你的回复..." class="w-full text-sm bg-white p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                            <div class="flex items-center gap-2">
+                               <button (click)="submitComment(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">发送</button>
+                               <button (click)="toggleCommentInput(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300">取消</button>
+                            </div>
+                          </div>
+                       </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="text-center py-16 text-slate-500">
+              <p>这里还没有内容。</p>
+            </div>
+          }
+        </main>
+      } @else if (activeTab() === 'inventory') {
+        <div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2">
+          <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+            <h1 class="text-2xl font-bold text-slate-800">物资清单</h1>
+            <button (click)="openNewItemPanel()" class="flex items-center justify-center w-8 h-8 rounded-full bg-sky-500 text-white hover:bg-sky-600 transition-colors shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+              </svg>
+            </button>
+          </div>
+          <div class="mt-2 bg-slate-200/80 p-1 rounded-lg flex gap-1 text-xs font-bold w-full">
+            <button (click)="activeInventoryTab.set('stock')" [class]="activeInventoryTab() === 'stock' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all flex-1 text-center">
+              库存清单
+            </button>
+            <button (click)="activeInventoryTab.set('shopping')" [class]="activeInventoryTab() === 'shopping' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all flex-1 text-center relative">
+              购物清单
+              @if (shoppingListItems().length > 0) {
+                <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                  {{ shoppingListItems().length }}
+                </span>
+              }
+            </button>
+          </div>
+        </div>
+
+        <main class="mt-6 space-y-6">
+           @if (activeInventoryTab() === 'stock') {
+              @if (inventoryCategories().length > 0) {
+                @for(category of inventoryCategories(); track category) {
+                  @let items = groupedInventory()[category];
+                  <div>
+                    <h2 class="text-lg font-bold text-slate-700 mb-2">{{ category }}</h2>
+                    <div class="space-y-3">
+                      @for(item of items; track item.id) {
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100 flex flex-wrap items-start gap-4 relative">
+                           <img [ngSrc]="item.image" alt="{{item.name}}" width="64" height="64" class="w-16 h-16 rounded-md object-cover flex-shrink-0">
+                           <div class="flex-1 min-w-[150px]">
+                              <h3 class="font-bold text-base text-slate-800">{{ item.name }}</h3>
+                              <div class="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                                 @if(item.brand) { <span>{{ item.brand }}</span> }
+                                 @if(item.brand && item.store) { <span>&middot;</span> }
+                                 @if(item.store) { <span>@ {{ item.store }}</span> }
+                              </div>
+                               @if(item.usageScenario) {
+                                <p class="text-xs text-slate-600 mt-1 italic">场景: {{ item.usageScenario }}</p>
+                               }
+                               @if(item.notes) { <p class="text-xs text-slate-600 mt-1">"{{ item.notes }}"</p> }
+                              <div class="mt-2 flex flex-wrap gap-2">
+                                <button (click)="updateItemStatus(item.id, 'IN_STOCK')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                                  [class]="item.status === 'IN_STOCK' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                                  有货
+                                </button>
+                                <button (click)="updateItemStatus(item.id, 'RUNNING_LOW')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                                  [class]="item.status === 'RUNNING_LOW' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                                  快用完了
+                                </button>
+                                <button (click)="updateItemStatus(item.id, 'OUT_OF_STOCK')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                                  [class]="item.status === 'OUT_OF_STOCK' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                                  已用完
+                                </button>
+                              </div>
+                              <div class="mt-3 pt-3 border-t border-slate-100">
+                                  <div class="flex justify-end items-center gap-1">
+                                      <button (click)="toggleInventoryCommentInput(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200">
+                                          补充信息 ({{ item.comments?.length ?? 0 }})
+                                      </button>
+                                      <button (click)="openEditItemPanel(item)" class="p-2 rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors" aria-label="编辑物品">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                          <path d="M11.354 1.646a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.354.146H2.5a.5.5 0 0 1-.5-.5v-1.208a.5.5 0 0 1 .146-.354l10-10ZM12 3.5 3.5 12H3v-.5L11.5 3l.5.5Z" />
+                                        </svg>
+                                      </button>
+                                      <button (click)="deleteItem(item.id, item.name)" class="p-2 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors" aria-label="删除物品">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                          <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                                        </svg>
+                                      </button>
+                                  </div>
+                              </div>
+                           </div>
+                           <span [class]="'absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded-full ' + getInventoryStatusConfig(item.status).buttonClasses">
+                              {{ getInventoryStatusConfig(item.status).text }}
+                           </span>
+                           <!-- Comments section -->
+                            @if((item.comments && item.comments.length > 0) || commentingOnItemId() === item.id) {
+                              <div class="mt-2 pt-3 border-t border-slate-100 w-full space-y-2">
+                                @for (comment of item.comments; track comment.id) {
+                                  <div class="flex items-start gap-2 animate-fade-in group">
+                                      <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                                      <div class="flex-1 text-sm bg-slate-100 px-3 py-2 rounded-lg rounded-tl-none">
+                                          <p class="font-semibold text-slate-800">{{ comment.author }}</p>
+                                          <p class="text-slate-600">{{ comment.content }}</p>
+                                      </div>
+                                      @if(comment.author === loggedInUser()!.name) {
+                                        <button (click)="deleteInventoryItemComment(item.id, comment.id)" class="p-1 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="删除评论">
+                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                            <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                                          </svg>
+                                        </button>
+                                      }
+                                  </div>
+                                }
+                                @if (commentingOnItemId() === item.id) {
+                                  <div class="flex items-start gap-2 animate-fade-in">
+                                      <img [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                                      <div class="flex-1 space-y-2">
+                                        <textarea [value]="newInventoryCommentContent()" (input)="onInventoryCommentInput($event)" rows="2" placeholder="补充使用经验..." class="w-full text-sm bg-white p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                                        <div class="flex items-center gap-2">
+                                          <button (click)="submitInventoryComment(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">发送</button>
+                                          <button (click)="toggleInventoryCommentInput(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300">取消</button>
+                                        </div>
+                                      </div>
+                                  </div>
+                                }
+                              </div>
+                            }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              } @else {
+                 <div class="text-center py-16 text-slate-500">
+                    <p>库存里还没有物品。</p>
+                    <p>点击右上角的 "+" 按钮添加一个吧。</p>
+                 </div>
+              }
+           } @else if (activeInventoryTab() === 'shopping') {
+              @if (shoppingListItems().length > 0) {
+                <div class="space-y-3">
+                    @for(item of shoppingListItems(); track item.id) {
+                      <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100 flex items-center gap-4">
+                        <img [ngSrc]="item.image" alt="{{item.name}}" width="64" height="64" class="w-16 h-16 rounded-md object-cover">
+                        <div class="flex-1">
+                          <h3 class="font-bold text-slate-800">{{ item.name }}</h3>
+                          <div class="text-xs text-slate-500 flex items-center gap-2">
+                             @if(item.brand) { <span>{{ item.brand }}</span> }
+                             @if(item.brand && item.store) { <span>&middot;</span> }
+                             @if(item.store) { <span>@ {{ item.store }}</span> }
+                          </div>
+                          @if(item.notes) { <p class="text-xs text-slate-600 mt-1 italic">"{{ item.notes }}"</p> }
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                           <span [class]="'text-xs font-semibold px-2 py-1 rounded-full ' + getInventoryStatusConfig(item.status).buttonClasses">
+                              {{ getInventoryStatusConfig(item.status).text }}
+                           </span>
+                           <button (click)="markAsPurchased(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+                              已购
+                           </button>
+                        </div>
+                      </div>
+                    }
+                </div>
+              } @else {
+                 <div class="text-center py-16 text-slate-500">
+                    <p>太棒了！</p>
+                    <p>购物清单是空的。</p>
+                 </div>
+              }
+           }
+        </main>
+
+      } @else if (activeTab() === 'health') {
+        <div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                <h1 class="text-2xl font-bold text-slate-800">健康日志</h1>
+            </div>
+        </div>
+
+        <main class="mt-6 space-y-6">
+            <!-- New Log Entry -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
+                <h2 class="font-bold text-slate-800 mb-2">记录今天的情况</h2>
+                <form [formGroup]="newHealthLogForm" (ngSubmit)="onAddNewHealthLogSubmit()">
+                    <textarea formControlName="content" rows="3" class="w-full text-sm bg-slate-50 p-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="今天感觉怎么样？有没有按时吃药或者运动..."></textarea>
+                    
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @for(option of quickLogOptions; track option.label) {
+                            <button type="button" (click)="selectQuickLog(option)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200">
+                                {{ option.emoji }} {{ option.label }}
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Environment Context -->
+                    <div class="mt-4 pt-3 border-t border-slate-200">
+                      @switch (environmentState()) {
+                        @case ('idle') {
+                           <div class="text-center text-sm text-slate-500 p-4">
+                              <p>保存时可附带当前环境信息。</p>
+                           </div>
+                        }
+                        @case ('loading') {
+                          <div class="text-center text-sm text-slate-500 p-4">
+                            <svg class="animate-spin h-6 w-6 text-slate-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="mt-2">正在获取您的位置和环境数据...</p>
+                            <p class="text-xs mt-1">请在浏览器弹窗中允许位置权限</p>
+                          </div>
+                        }
+                        @case ('success') {
+                          @if (currentEnvironmentalContext(); as context) {
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-slate-600 font-medium w-full">
+                                    @if(context.location?.name) {
+                                      <div class="flex items-center gap-1.5" title="{{context.location.latitude | number:'1.2-2'}}, {{context.location.longitude | number:'1.2-2'}}">
+                                        <span class="text-lg">📍</span>
+                                        <span class="truncate">{{ context.location.name }}</span>
+                                      </div>
+                                    } @else if (context.location) {
+                                      <div class="flex items-center gap-1.5" title="位置名称获取失败">
+                                          <span class="text-lg">📍</span>
+                                          <span class="truncate text-xs font-mono">{{context.location.latitude | number:'1.2-2'}}, {{context.location.longitude | number:'1.2-2'}}</span>
+                                      </div>
+                                    }
+                                    <div class="flex items-center gap-1.5">
+                                      <span class="text-lg">{{ getWeatherIcon(context.weather.weatherCode) }}</span>
+                                      <span>{{ context.weather.temperature | number:'1.0-0' }}°C</span>
+                                    </div>
+                                    @if(context.airQuality.aqi) {
+                                      <div class="flex items-center gap-1.5">
+                                        <span [class]="'px-2 py-0.5 rounded-full text-xs font-bold ' + getAqiInfo(context.airQuality.aqi).colorClasses">
+                                          AQI {{ getAqiInfo(context.airQuality.aqi).text }} {{ context.airQuality.aqi }}
+                                        </span>
+                                      </div>
+                                    }
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-lg">💧</span>
+                                        <span>{{ context.weather.humidity }}% 湿度</span>
+                                    </div>
+                                </div>
+                                <button type="button" (click)="fetchCurrentEnvironmentData()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors" aria-label="刷新环境数据">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                    <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201-4.42 5.5 5.5 0 0 1 10.842 2.162.75.75 0 0 1-1.49-.174.25.25 0 0 0-.493-.062c-.22.65-.54 1.253-.942 1.795a.75.75 0 0 1-1.054.093Z" clip-rule="evenodd" />
+                                    <path fill-rule="evenodd" d="M4.688 8.576a5.5 5.5 0 0 1 9.201 4.42 5.5 5.5 0 0 1-10.842-2.162.75.75 0 0 1 1.49.174.25.25 0 0 0 .493.062c.22-.65.54-1.253.942-1.795a.75.75 0 0 1 1.054-.093ZM10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" clip-rule="evenodd" />
+                                  </svg>
+                                </button>
+                            </div>
+                          }
+                        }
+                        @case ('error') {
+                           <div class="text-center text-sm text-rose-600 p-4 bg-rose-50 rounded-lg flex justify-between items-center">
+                              <p>{{ environmentDataError() }}</p>
+                              <button type="button" (click)="fetchCurrentEnvironmentData()" class="p-2 rounded-full text-rose-500 hover:bg-rose-100 hover:text-rose-700 transition-colors" aria-label="重试">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                    <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201-4.42 5.5 5.5 0 0 1 10.842 2.162.75.75 0 0 1-1.49-.174.25.25 0 0 0-.493-.062c-.22.65-.54 1.253-.942 1.795a.75.75 0 0 1-1.054.093Z" clip-rule="evenodd" />
+                                    <path fill-rule="evenodd" d="M4.688 8.576a5.5 5.5 0 0 1 9.201 4.42 5.5 5.5 0 0 1-10.842-2.162.75.75 0 0 1 1.49.174.25.25 0 0 0 .493.062c.22-.65.54-1.253.942-1.795a.75.75 0 0 1 1.054-.093ZM10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" clip-rule="evenodd" />
+                                  </svg>
+                                </button>
+                           </div>
+                        }
+                      }
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit" [disabled]="newHealthLogForm.invalid || isSavingHealthLog()" class="flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                          @if(isSavingHealthLog()) {
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>保存中...</span>
+                          } @else {
+                            <span>保存记录</span>
+                          }
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- History -->
+            @if(userHealthLogs().length > 0) {
+              <div class="space-y-4">
+                @for(log of userHealthLogs(); track log.id) {
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100 animate-fade-in-down">
+                        <div class="flex justify-between items-start">
+                            <p class="text-slate-700 leading-relaxed">{{ log.content }}</p>
+                            @if(log.mood) {
+                                <span class="text-2xl" [title]="log.mood">{{ getMoodEmoji(log.mood) }}</span>
+                            }
+                        </div>
+                         @if(log.environmentalContext; as context) {
+                            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 font-medium">
+                                @if(context.location?.name) {
+                                    <div class="flex items-center gap-1" title="{{context.location.latitude | number:'1.2-2'}}, {{context.location.longitude | number:'1.2-2'}}">
+                                        <span class="text-base">📍</span><span>{{ context.location.name }}</span>
+                                    </div>
+                                } @else if (context.location) {
+                                    <div class="flex items-center gap-1" title="位置名称获取失败">
+                                        <span class="text-base">📍</span><span class="font-mono">{{context.location.latitude | number:'1.2-2'}}, {{context.location.longitude | number:'1.2-2'}}</span>
+                                    </div>
+                                }
+                                <div class="flex items-center gap-1">
+                                    <span class="text-base">{{ getWeatherIcon(context.weather.weatherCode) }}</span>
+                                    <span>{{ context.weather.temperature | number:'1.0-0' }}°C</span>
+                                </div>
+                                @if(context.airQuality.aqi) {
+                                    <span [class]="'px-1.5 py-0.5 rounded-full font-bold ' + getAqiInfo(context.airQuality.aqi).colorClasses">
+                                    AQI {{ getAqiInfo(context.airQuality.aqi).text }} {{ context.airQuality.aqi }}
+                                    </span>
+                                }
+                                <div class="flex items-center gap-1">
+                                    <span class="text-base">💧</span>
+                                    <span>{{ context.weather.humidity }}%</span>
+                                </div>
+                            </div>
+                        }
+                        <p class="text-right text-xs text-slate-400 mt-2">{{ log.timestamp | date:'longDate' }} at {{ log.timestamp | date:'shortTime' }}</p>
+                    </div>
+                }
+              </div>
+            }
+        </main>
+      } @else if (activeTab() === 'profile') {
+        <div class="pt-8">
+            <div class="flex flex-col items-center">
+                <img priority [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="96" height="96" class="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg">
+                <h1 class="mt-4 text-3xl font-bold text-slate-800">{{ loggedInUser()!.name }}</h1>
+                <p class="mt-1 text-slate-500">家庭成员</p>
+                <div class="mt-6 w-full max-w-xs bg-white p-4 rounded-lg shadow-sm border border-slate-100 text-sm">
+                  <div class="flex justify-between">
+                     <span class="text-slate-500">年龄</span>
+                     <span class="font-semibold text-slate-700">{{ loggedInUser()!.age }} 岁</span>
+                  </div>
+                  <div class="flex justify-between mt-2 pt-2 border-t">
+                     <span class="text-slate-500">加入年份</span>
+                     <span class="font-semibold text-slate-700">{{ currentYear }}</span>
+                  </div>
+                </div>
+
+                <button (click)="logout()" class="mt-8 w-full max-w-xs flex justify-center py-2 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                    登出
+                </button>
+            </div>
+        </div>
+      }
+    </div>
+
+    <!-- Floating Action Button & Panels -->
+    <div class="fixed bottom-0 left-0 right-0 z-20 max-w-2xl mx-auto pointer-events-none">
+      <!-- Panels' Background Overlay -->
+      @if (isFabMenuOpen() || isNewPostPanelOpen() || isNewItemPanelOpen()) {
+        <div (click)="isFabMenuOpen.set(false); closeNewPostPanel(); closeNewItemPanel();" class="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in pointer-events-auto"></div>
+      }
+
+      <!-- FAB Menu -->
+      @if(isFabMenuOpen()) {
+        <div class="absolute bottom-24 right-4 sm:right-6 lg:right-8 space-y-3 pointer-events-auto">
+          <button (click)="quickSend('meal_suggestion')" class="flex items-center gap-3 w-48 justify-end animate-fade-in-down" style="animation-delay: 0.2s;">
+            <span class="bg-white text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg shadow-lg">想吃什么? 🤔</span>
+            <span class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center">🍲</span>
+          </button>
+          <button (click)="quickSend('meeting')" class="flex items-center gap-3 w-48 justify-end animate-fade-in-down" style="animation-delay: 0.15s;">
+            <span class="bg-white text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg shadow-lg">开个会 📅</span>
+            <span class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center">🗓️</span>
+          </button>
+          <button (click)="quickSend('help')" class="flex items-center gap-3 w-48 justify-end animate-fade-in-down" style="animation-delay: 0.1s;">
+            <span class="bg-white text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg shadow-lg">求帮助 🙏</span>
+            <span class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center">🙋‍♀️</span>
+          </button>
+          <button (click)="quickSend('care')" class="flex items-center gap-3 w-48 justify-end animate-fade-in-down" style="animation-delay: 0.05s;">
+            <span class="bg-white text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg shadow-lg">求关心 ❤️</span>
+            <span class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center">🤒</span>
+          </button>
+          <button (click)="openNewPostPanel()" class="flex items-center gap-3 w-48 justify-end animate-fade-in-down">
+            <span class="bg-white text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg shadow-lg">写点东西 ✍️</span>
+            <span class="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center">📝</span>
+          </button>
+        </div>
+      }
+      
+      <!-- Bottom Navigation Bar -->
+      <footer class="bg-white/80 backdrop-blur-md border-t border-slate-200 pointer-events-auto">
+        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-5 items-center">
+            <button (click)="setActiveTab('home')" class="flex flex-col items-center justify-center py-2 text-xs font-semibold rounded-lg transition-colors" [class]="activeTab() === 'home' ? 'text-sky-600' : 'text-slate-500 hover:text-sky-600'">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 mb-0.5"><path fill-rule="evenodd" d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7A1 1 0 0 1 17 11h-1v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7Z" clip-rule="evenodd" /></svg>
+              首页
+            </button>
+            <button (click)="setActiveTab('inventory')" class="flex flex-col items-center justify-center py-2 text-xs font-semibold rounded-lg transition-colors" [class]="activeTab() === 'inventory' ? 'text-sky-600' : 'text-slate-500 hover:text-sky-600'">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 mb-0.5"><path d="M5.5 16.5a1 1 0 0 1-1-1V4.83a1 1 0 0 1 .316-.744l3-2.5a1 1 0 0 1 1.368 0l3 2.5a1 1 0 0 1 .316.744V15.5a1 1 0 0 1-1 1h-6.5Z" /><path d="M14.5 9a.5.5 0 0 1 .5.5v5.5a1 1 0 0 1-1 1h-2a.5.5 0 0 1 0-1h1.5V9.5a.5.5 0 0 1 .5-.5Z" /></svg>
+              物资
+            </button>
+            <div class="flex justify-center">
+                <button (click)="toggleFabMenu()" class="w-14 h-14 bg-sky-500 text-white rounded-full shadow-lg -translate-y-4 flex items-center justify-center ring-4 ring-white transition-transform" [class.rotate-45]="isFabMenuOpen()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-7 h-7"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>
+                </button>
+            </div>
+            <button (click)="setActiveTab('health')" class="flex flex-col items-center justify-center py-2 text-xs font-semibold rounded-lg transition-colors" [class]="activeTab() === 'health' ? 'text-sky-600' : 'text-slate-500 hover:text-sky-600'">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 mb-0.5"><path fill-rule="evenodd" d="M8.5 2.5A.5.5 0 0 0 8 3v1.5H5.5a.5.5 0 0 0 0 1H8V7H5.5a.5.5 0 0 0 0 1H8v1.5a.5.5 0 0 0 1 0V8H11.5a.5.5 0 0 0 0-1H9V5.5h2.5a.5.5 0 0 0 0-1H9V3a.5.5 0 0 0-.5-.5Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M10 1.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17ZM0 10a10 10 0 1 1 20 0 10 10 0 0 1-20 0Z" clip-rule="evenodd" /></svg>
+              健康
+            </button>
+            <button (click)="setActiveTab('profile')" class="flex flex-col items-center justify-center py-2 text-xs font-semibold rounded-lg transition-colors" [class]="activeTab() === 'profile' ? 'text-sky-600' : 'text-slate-500 hover:text-sky-600'">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 mb-0.5"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-5.5-2.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10 12a5.99 5.99 0 0 0-4.793 2.39A6.483 6.483 0 0 0 10 16.5a6.483 6.483 0 0 0 4.793-2.11A5.99 5.99 0 0 0 10 12Z" clip-rule="evenodd" /></svg>
+              我的
+            </button>
+        </div>
+      </footer>
+
+      <!-- New Post Panel -->
+      @if(isNewPostPanelOpen()) {
+        <div class="fixed bottom-0 left-0 right-0 z-30 max-w-2xl mx-auto pointer-events-auto">
+            <div class="bg-white p-4 shadow-2xl rounded-t-2xl animate-slide-in-up">
+                <h2 class="font-bold text-slate-800">写点东西...</h2>
+                <div class="mt-2 flex items-center gap-2">
+                    <img [ngSrc]="loggedInUser()!.avatar" alt="你的头像" width="32" height="32" class="w-8 h-8 rounded-full object-cover">
+                    <div>
+                      <p class="font-semibold text-sm">{{ loggedInUser()!.name }}</p>
+                      <div class="bg-slate-100 p-0.5 rounded-lg flex gap-1 text-xs font-semibold mt-1">
+                        <button (click)="newPostCategory.set('daily')" [class]="newPostCategory() === 'daily' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500'" class="px-2 py-0.5 rounded-md">📝 日常</button>
+                        <button (click)="newPostCategory.set('health')" [class]="newPostCategory() === 'health' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500'" class="px-2 py-0.5 rounded-md">❤️ 健康</button>
+                        <button (click)="newPostCategory.set('knowledge')" [class]="newPostCategory() === 'knowledge' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500'" class="px-2 py-0.5 rounded-md">💡 分享</button>
+                      </div>
+                    </div>
+                </div>
+                <textarea [value]="newPostContent()" (input)="onNewPostInput($event)" rows="4" class="mt-3 w-full text-sm bg-slate-50 p-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="有什么新鲜事想和家人分享吗？"></textarea>
+                <div class="mt-3 flex justify-end gap-2">
+                    <button (click)="closeNewPostPanel()" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">取消</button>
+                    <button (click)="publishNewPost()" [disabled]="!newPostContent()" class="px-4 py-2 text-sm font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-md transition-colors disabled:bg-slate-300">发布</button>
+                </div>
+            </div>
+        </div>
+      }
+
+      <!-- New/Edit Inventory Item Panel -->
+      @if(isNewItemPanelOpen()) {
+        <div class="fixed bottom-0 left-0 right-0 z-30 max-w-2xl mx-auto pointer-events-auto">
+            <form [formGroup]="newItemForm" (ngSubmit)="onAddNewItemSubmit()" class="bg-white p-4 shadow-2xl rounded-t-2xl animate-slide-in-up">
+                <h2 class="font-bold text-slate-800">{{ editingItemId() ? '编辑物资' : '添加新物资' }}</h2>
+                <div class="mt-4 grid grid-cols-1 gap-4 text-sm">
+                  <div>
+                      <label class="font-medium">名称*</label>
+                      <input formControlName="name" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" required>
+                  </div>
+                  <div>
+                      <label class="font-medium">分类*</label>
+                      <select formControlName="category" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="食材">食材</option>
+                        <option value="清洁用品">清洁用品</option>
+                        <option value="生活用品">生活用品</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label class="font-medium">图片链接</label>
+                      <input formControlName="image" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="font-medium">品牌</label>
+                        <input formControlName="brand" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="font-medium">商店</label>
+                        <input formControlName="store" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                  </div>
+                   <div>
+                      <label class="font-medium">使用场景</label>
+                      <textarea formControlName="usageScenario" rows="2" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="例如：适合直接饮用、制作拿铁或燕麦粥"></textarea>
+                  </div>
+                  <div>
+                      <label class="font-medium">使用经验/备注</label>
+                      <textarea formControlName="notes" rows="2" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="例如：这个牌子味道更好、买大包装的"></textarea>
+                  </div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" (click)="closeNewItemPanel()" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">取消</button>
+                    <button type="submit" [disabled]="newItemForm.invalid" class="px-4 py-2 text-sm font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-md transition-colors disabled:bg-slate-300">
+                      {{ editingItemId() ? '保存更改' : '添加' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+      }
+    </div>
+  }
+</div>

@@ -1,6 +1,8 @@
+
+
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo } from './types';
+import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo, InventoryItemComment } from './types';
 import { of, Observable, throwError, forkJoin } from 'rxjs';
 import { tap, catchError, map, switchMap, delay } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from './config';
@@ -11,7 +13,7 @@ import { FAMILY_MEMBERS } from './auth.service';
   providedIn: 'root'
 })
 export class DataService {
-    private http = inject(HttpClient) as HttpClient;
+    private http: HttpClient = inject(HttpClient);
     
     posts = signal<Post[]>([]);
     inventory = signal<InventoryItem[]>([]);
@@ -124,6 +126,29 @@ export class DataService {
         );
     }
 
+    deleteComment(postId: number, commentId: number): Observable<Post> {
+        if (USE_MOCK_API) {
+            let updatedPost: Post | undefined;
+            this.posts.update(posts => posts.map(p => {
+                if (p.id === postId) {
+                    updatedPost = { ...p, comments: p.comments.filter(c => c.id !== commentId) };
+                    return updatedPost;
+                }
+                return p;
+            }));
+            return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
+        }
+        return this.http.delete<Post>(`${API_BASE_URL}/posts/${postId}/comments/${commentId}`).pipe(
+            tap((updatedPost: Post) => {
+                this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
+            }),
+            catchError(err => {
+                console.error('Failed to delete comment', err);
+                return throwError(() => err);
+            })
+        );
+    }
+
     markTaskAsDone(postId: number): Observable<Post> {
       if (USE_MOCK_API) {
         let updatedPost: Post | undefined;
@@ -179,7 +204,6 @@ export class DataService {
 
     private getCurrentWeather(latitude: number, longitude: number): Observable<WeatherInfo> {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
-      // FIX: Provide a type for the HTTP response to avoid treating it as 'unknown'.
       return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
         map((response) => ({
           temperature: response.current.temperature_2m,
@@ -191,7 +215,6 @@ export class DataService {
     
     private getCurrentAirQuality(latitude: number, longitude: number): Observable<AirQualityInfo> {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
-      // FIX: Provide a type for the HTTP response to avoid treating it as 'unknown'.
       return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
         map((response) => ({
           aqi: response.current.us_aqi,
@@ -207,7 +230,6 @@ export class DataService {
 
     private getLocationName(latitude: number, longitude: number): Observable<string | null> {
       const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
-      // FIX: Provide a type for the HTTP response to avoid treating it as 'unknown'.
       return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
           map((response) => {
               if (response.results && response.results.length > 0) {
@@ -296,11 +318,12 @@ export class DataService {
       );
     }
 
-    addInventoryItem(itemData: Omit<InventoryItem, 'id' | 'status'>): Observable<InventoryItem> {
+    addInventoryItem(itemData: Omit<InventoryItem, 'id' | 'status' | 'comments'>): Observable<InventoryItem> {
       if (USE_MOCK_API) {
         const newItem: InventoryItem = {
             id: Date.now(),
             status: 'IN_STOCK',
+            comments: [],
             ...itemData
         };
         this.inventory.update(items => [newItem, ...items]);
@@ -315,6 +338,45 @@ export class DataService {
             return throwError(() => err);
         })
       );
+    }
+
+    updateInventoryItem(itemId: number, itemData: Partial<Omit<InventoryItem, 'id' | 'status' | 'comments'>>): Observable<InventoryItem> {
+        if (USE_MOCK_API) {
+            let updatedItem: InventoryItem | undefined;
+            this.inventory.update(items => items.map(i => {
+                if (i.id === itemId) {
+                    updatedItem = { ...i, ...itemData };
+                    return updatedItem;
+                }
+                return i;
+            }));
+            return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
+        }
+        return this.http.patch<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}`, itemData).pipe(
+            tap((updatedItem: InventoryItem) => {
+                this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
+            }),
+            catchError(err => {
+                console.error('Failed to update inventory item', err);
+                return throwError(() => err);
+            })
+        );
+    }
+
+    deleteInventoryItem(itemId: number): Observable<void> {
+        if (USE_MOCK_API) {
+            this.inventory.update(items => items.filter(i => i.id !== itemId));
+            return of(undefined).pipe(delay(100));
+        }
+        return this.http.delete<void>(`${API_BASE_URL}/inventory/${itemId}`).pipe(
+            tap(() => {
+                this.inventory.update(items => items.filter(i => i.id !== itemId));
+            }),
+            catchError(err => {
+                console.error('Failed to delete inventory item', err);
+                return throwError(() => err);
+            })
+        );
     }
 
     updateInventoryItemStatus(itemId: number, status: InventoryStatus): Observable<InventoryItem> {
@@ -338,6 +400,62 @@ export class DataService {
             return throwError(() => err);
         })
       );
+    }
+
+    addInventoryComment(itemId: number, content: string, currentUser: Assignee): Observable<InventoryItem> {
+        if (USE_MOCK_API) {
+            let updatedItem: InventoryItem | undefined;
+            const newComment: InventoryItemComment = {
+                id: Date.now(),
+                author: currentUser.name,
+                authorAvatar: currentUser.avatar,
+                content: content,
+                timestamp: new Date().toISOString(),
+            };
+            this.inventory.update(items => items.map(i => {
+                if (i.id === itemId) {
+                    const existingComments = i.comments ?? [];
+                    updatedItem = { ...i, comments: [...existingComments, newComment] };
+                    return updatedItem;
+                }
+                return i;
+            }));
+            return updatedItem ? of(updatedItem).pipe(delay(200)) : throwError(() => new Error('Item not found'));
+        }
+        // This would be the implementation for a real API
+        return this.http.post<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}/comments`, { content }).pipe(
+            tap((updatedItem: InventoryItem) => {
+                this.inventory.update(items => items.map(p => p.id === itemId ? updatedItem : p));
+            }),
+            catchError(err => {
+                console.error('Failed to add inventory comment', err);
+                return throwError(() => err);
+            })
+        );
+    }
+
+    deleteInventoryComment(itemId: number, commentId: number): Observable<InventoryItem> {
+        if (USE_MOCK_API) {
+            let updatedItem: InventoryItem | undefined;
+            this.inventory.update(items => items.map(i => {
+                if (i.id === itemId) {
+                    const existingComments = i.comments ?? [];
+                    updatedItem = { ...i, comments: existingComments.filter(c => c.id !== commentId) };
+                    return updatedItem;
+                }
+                return i;
+            }));
+            return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
+        }
+        return this.http.delete<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}/comments/${commentId}`).pipe(
+            tap((updatedItem: InventoryItem) => {
+                this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
+            }),
+            catchError(err => {
+                console.error('Failed to delete inventory comment', err);
+                return throwError(() => err);
+            })
+        );
     }
 
     // --- AI Methods (local simulation) ---

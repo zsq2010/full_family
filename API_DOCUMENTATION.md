@@ -58,7 +58,20 @@ interface InventoryItem {
   brand?: string;
   store?: string;
   notes?: string;
+  usageScenario?: string;
   status: 'IN_STOCK' | 'RUNNING_LOW' | 'OUT_OF_STOCK'; // 默认: 'IN_STOCK'
+  comments?: InventoryItemComment[];
+}
+```
+
+### InventoryItemComment
+```typescript
+interface InventoryItemComment {
+  id: number; // 由后端生成
+  author: string;
+  authorAvatar: string;
+  content: string;
+  timestamp: string; // ISO 8601 日期字符串，由后端生成
 }
 ```
 
@@ -185,6 +198,18 @@ interface HealthLog {
 -   **响应**:
     -   `200 OK`: 返回完整更新后的 `Post` 对象。
 
+### `DELETE /posts/{postId}/comments/{commentId}`
+
+删除特定帖子中的一条评论。后端应验证执行此操作的用户是否是该评论的作者。
+
+-   **路径参数**:
+    -   `postId` (number): 评论所属帖子的 ID。
+    -   `commentId` (number): 要删除的评论 ID。
+-   **响应**:
+    -   `200 OK`: 返回完整更新后的 `Post` 对象。
+    -   `403 Forbidden`: 用户无权删除该评论。
+    -   `404 Not Found`: 未找到帖子或评论。
+
 ### `PATCH /posts/{postId}`
 
 更新一个特定帖子。目前用于将任务标记为“已完成”。
@@ -216,9 +241,9 @@ interface HealthLog {
 
 ### `POST /inventory`
 
-向物资清单中添加一个新项目。`id` 由后端生成，`status` 应默认为 `IN_STOCK`。
+向物资清单中添加一个新项目。`id`、`status` 和 `comments` 由后端生成/初始化。
 
--   **请求体**: `Omit<InventoryItem, 'id' | 'status'>`
+-   **请求体**: `Omit<InventoryItem, 'id' | 'status' | 'comments'>`
     ```json
     {
       "name": "有机全脂牛奶",
@@ -226,7 +251,8 @@ interface HealthLog {
       "category": "食材",
       "brand": "Organic Valley",
       "store": "Costco",
-      "notes": "买大包装的，孩子们喜欢喝。"
+      "notes": "买大包装的，孩子们喜欢喝。",
+      "usageScenario": "适合直接饮用、制作拿铁或燕麦粥"
     }
     ```
 -   **响应**:
@@ -234,18 +260,56 @@ interface HealthLog {
 
 ### `PATCH /inventory/{itemId}`
 
-更新特定物资项目的状态。
+更新特定物资项目的部分或全部信息（例如状态、名称、备注等）。
 
 -   **路径参数**:
     -   `itemId` (number): 要更新的项目 ID。
--   **请求体**:
+-   **请求体**: `Partial<Omit<InventoryItem, 'id' | 'comments'>>`
     ```json
     {
-      "status": "RUNNING_LOW"
+      "status": "RUNNING_LOW",
+      "notes": "Costco 的价格更划算。" 
     }
     ```
 -   **响应**:
     -   `200 OK`: 返回完整更新后的 `InventoryItem` 对象。
+
+### `DELETE /inventory/{itemId}`
+
+从物资清单中删除一个项目。
+
+-   **路径参数**:
+    -   `itemId` (number): 要删除的项目 ID。
+-   **响应**:
+    -   `204 No Content`: 项目删除成功。
+    -   `404 Not Found`: 未找到该项目。
+
+### `POST /inventory/{itemId}/comments`
+
+向特定物资项目添加一条评论。作者信息应从当前用户的会话中获取。
+
+-   **路径参数**:
+    -   `itemId` (number): 要评论的项目 ID。
+-   **请求体**:
+    ```json
+    {
+      "content": "这个牌子比之前买的好用。"
+    }
+    ```
+-   **响应**:
+    -   `200 OK`: 返回完整更新后的 `InventoryItem` 对象。
+
+### `DELETE /inventory/{itemId}/comments/{commentId}`
+
+删除特定物资项目中的一条评论。后端应验证执行此操作的用户是否是该评论的作者。
+
+-   **路径参数**:
+    -   `itemId` (number): 评论所属项目的 ID。
+    -   `commentId` (number): 要删除的评论 ID。
+-   **响应**:
+    -   `200 OK`: 返回完整更新后的 `InventoryItem` 对象。
+    -   `403 Forbidden`: 用户无权删除该评论。
+    -   `404 Not Found`: 未找到项目或评论。
 
 ---
 

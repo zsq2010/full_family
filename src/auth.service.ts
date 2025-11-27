@@ -1,3 +1,4 @@
+
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Assignee } from './types';
@@ -12,12 +13,18 @@ export const FAMILY_MEMBERS: Assignee[] = [
   { name: '亚历克斯', avatar: 'https://picsum.photos/seed/alex/100/100', age: 18 },
 ];
 
+const USER_MAPPING: { [username: string]: string } = {
+    'me': '我',
+    'mom': '妈妈',
+    'dad': '爸爸',
+    'alex': '亚历克斯',
+};
+
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  // FIX: Cast injected HttpClient to its type to avoid type inference issues.
-  private http = inject(HttpClient) as HttpClient;
+  private http: HttpClient = inject(HttpClient);
   currentUser = signal<Assignee | null>(null);
 
   constructor() {
@@ -27,7 +34,8 @@ export class AuthService {
   checkSession(): Observable<Assignee | null> {
     if (USE_MOCK_API) {
       if (DEV_AUTO_LOGIN) {
-        const user = FAMILY_MEMBERS.find(m => m.name.toLowerCase() === DEV_DEFAULT_USER) ?? FAMILY_MEMBERS[0];
+        const displayName = USER_MAPPING[DEV_DEFAULT_USER.toLowerCase()];
+        const user = FAMILY_MEMBERS.find(m => m.name === displayName) ?? FAMILY_MEMBERS[0];
         this.currentUser.set(user);
         return of(user);
       }
@@ -46,8 +54,9 @@ export class AuthService {
 
   login(username: string, password: string): Observable<Assignee> {
     if (USE_MOCK_API) {
+      const displayName = USER_MAPPING[username.toLowerCase()];
       const user = FAMILY_MEMBERS.find(
-        (m) => m.name.toLowerCase() === username.toLowerCase()
+        (m) => m.name === displayName
       );
       if (user && password === 'password123') {
         this.currentUser.set(user);

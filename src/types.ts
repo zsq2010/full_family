@@ -65,6 +65,14 @@ export interface Post {
 export type InventoryCategory = '食材' | '清洁用品' | '生活用品';
 export type InventoryStatus = 'IN_STOCK' | 'RUNNING_LOW' | 'OUT_OF_STOCK';
 
+export interface InventoryItemComment {
+  id: number;
+  author: string;
+  authorAvatar: string;
+  content: string;
+  timestamp: string;
+}
+
 export interface InventoryItem {
   id: number;
   name: string;
@@ -73,7 +81,9 @@ export interface InventoryItem {
   brand?: string;
   store?: string;
   notes?: string;
+  usageScenario?: string;
   status: InventoryStatus;
+  comments?: InventoryItemComment[];
 }
 
 // --- New Types for Health Logging ---
