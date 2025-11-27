@@ -1,10 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Assignee } from './types';
-import { DEV_AUTO_LOGIN, DEV_DEFAULT_USER } from './config';
-
-// --- 开发配置 ---
-// 配置已移至 src/config.ts
-// --------------------
+import { API_BASE_URL, USE_MOCK_API, DEV_AUTO_LOGIN, DEV_DEFAULT_USER } from './config';
+import { Observable, of, throwError } from 'rxjs';
+import { tap, catchError } from 'rxjs';
 
 export const FAMILY_MEMBERS: Assignee[] = [
   { name: '我', avatar: 'https://picsum.photos/seed/me/100/100', age: 25 },
@@ -13,42 +12,72 @@ export const FAMILY_MEMBERS: Assignee[] = [
   { name: '亚历克斯', avatar: 'https://picsum.photos/seed/alex/100/100', age: 18 },
 ];
 
-// Mock user credentials. Usernames are for login, names are for display.
-const USERS = new Map<string, { password: string, user: Assignee }>([
-    ['me', { password: 'password123', user: FAMILY_MEMBERS[0] }],
-    ['mom', { password: 'password123', user: FAMILY_MEMBERS[1] }],
-    ['dad', { password: 'password123', user: FAMILY_MEMBERS[2] }],
-    ['alex', { password: 'password123', user: FAMILY_MEMBERS[3] }],
-]);
-
-
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
+  // FIX: Cast injected HttpClient to its type to avoid type inference issues.
+  private http = inject(HttpClient) as HttpClient;
   currentUser = signal<Assignee | null>(null);
 
   constructor() {
-    // Read auto-login settings from the config file.
-    if (DEV_AUTO_LOGIN) {
-      const devUser = USERS.get(DEV_DEFAULT_USER);
-      if (devUser) {
-        this.currentUser.set(devUser.user);
+    // 构造函数现在为空，会话检查由应用组件主动发起
+  }
+
+  checkSession(): Observable<Assignee | null> {
+    if (USE_MOCK_API) {
+      if (DEV_AUTO_LOGIN) {
+        const user = FAMILY_MEMBERS.find(m => m.name.toLowerCase() === DEV_DEFAULT_USER) ?? FAMILY_MEMBERS[0];
+        this.currentUser.set(user);
+        return of(user);
       }
+      this.currentUser.set(null);
+      return of(null);
     }
+
+    return this.http.get<Assignee>(`${API_BASE_URL}/auth/me`).pipe(
+      tap(user => this.currentUser.set(user)),
+      catchError(() => {
+        this.currentUser.set(null);
+        return of(null);
+      })
+    );
   }
 
-  login(username: string, password: string): boolean {
-    const cleanUsername = username.toLowerCase().trim();
-    const userData = USERS.get(cleanUsername);
-    if (userData && userData.password === password) {
-      this.currentUser.set(userData.user);
-      return true;
+  login(username: string, password: string): Observable<Assignee> {
+    if (USE_MOCK_API) {
+      const user = FAMILY_MEMBERS.find(
+        (m) => m.name.toLowerCase() === username.toLowerCase()
+      );
+      if (user && password === 'password123') {
+        this.currentUser.set(user);
+        return of(user);
+      }
+      return throwError(() => new Error('无效的用户名或密码'));
     }
-    return false;
+
+    return this.http.post<Assignee>(`${API_BASE_URL}/auth/login`, { username, password }).pipe(
+      tap(user => {
+        this.currentUser.set(user);
+      })
+    );
   }
 
-  logout(): void {
-    this.currentUser.set(null);
+  logout(): Observable<unknown> {
+    if (USE_MOCK_API) {
+      this.currentUser.set(null);
+      return of(null);
+    }
+    
+    return this.http.post(`${API_BASE_URL}/auth/logout`, {}).pipe(
+      tap(() => {
+        this.currentUser.set(null);
+      }),
+      catchError((err) => {
+        console.error('Logout API call failed, logging out on client.', err);
+        this.currentUser.set(null);
+        return of(null);
+      })
+    );
   }
 }

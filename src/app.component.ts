@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, OnInit, OnDestroy, computed, ElementRef, viewChild, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, OnInit, OnDestroy, computed, ElementRef, viewChild, inject, effect } from '@angular/core';
 import { NgOptimizedImage, KeyValuePipe, DecimalPipe } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { GoogleGenAI } from '@google/genai';
@@ -41,6 +41,7 @@ export class AppComponent implements OnInit, OnDestroy {
   inventory = this.dataService.inventory;
   healthLogs = this.dataService.healthLogs;
   loginError = signal<string | null>(null);
+  isLoggingIn = signal(false);
 
   loginForm = new FormGroup({
     username: new FormControl('', Validators.required),
@@ -105,15 +106,27 @@ export class AppComponent implements OnInit, OnDestroy {
     } else {
       console.warn("Google Gemini API key not found. Please add it to src/config.ts. AI features will be disabled.");
     }
+
+    // React to login/logout events to fetch or clear data.
+    effect(() => {
+      if (this.loggedInUser()) {
+        this.dataService.getPosts().subscribe();
+        this.dataService.getInventory().subscribe();
+        this.dataService.getHealthLogs().subscribe();
+      } else {
+        this.dataService.clearAllData();
+      }
+    });
   }
 
   ngOnInit(): void {
+    // Start the clock
     this.timer = window.setInterval(() => {
       this.now.set(new Date());
     }, 1000);
-    this.dataService.getPosts().subscribe();
-    this.dataService.getInventory().subscribe();
-    this.dataService.getHealthLogs().subscribe();
+
+    // Check for an existing session when the app loads.
+    this.authService.checkSession().subscribe();
   }
 
   ngOnDestroy(): void {
@@ -124,21 +137,31 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Authentication ---
   onLoginSubmit(): void {
-    if (this.loginForm.invalid) {
+    if (this.loginForm.invalid || this.isLoggingIn()) {
       return;
     }
+    this.isLoggingIn.set(true);
     this.loginError.set(null);
     const { username, password } = this.loginForm.value;
-    const success = this.authService.login(username!, password!);
-    if (!success) {
-      this.loginError.set('无效的用户名或密码。');
-    }
+    
+    this.authService.login(username!, password!).subscribe({
+      next: () => {
+        // Successful login, effect will trigger data fetch.
+        this.isLoggingIn.set(false);
+      },
+      error: () => {
+        this.loginError.set('无效的用户名或密码。');
+        this.isLoggingIn.set(false);
+      }
+    });
   }
 
   logout(): void {
-    this.authService.logout();
-    this.loginForm.reset();
-    this.activeTab.set('home');
+    this.authService.logout().subscribe(() => {
+      this.loginForm.reset();
+      this.activeTab.set('home');
+      // Effect will handle clearing data.
+    });
   }
 
   // --- UI Navigation & Interaction ---
@@ -276,25 +299,25 @@ export class AppComponent implements OnInit, OnDestroy {
     const currentUser = this.loggedInUser();
     if (!currentUser) return;
 
-    let newPost: Omit<Post, 'id'>;
+    let newPost: Omit<Post, 'id' | 'author' | 'authorAvatar' | 'timestamp' | 'reactions' | 'comments' | 'assignees'>;
     let targetTab: ActiveHomeTab;
 
     switch (type) {
       case 'care':
         targetTab = 'health';
-        newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'FEELING', content: '今天感觉有点不舒服。🤒 希望能得到一些关心。', subject: currentUser, assignees: [], reactions: [], comments: [] };
+        newPost = { type: 'FEELING', content: '今天感觉有点不舒服。🤒 希望能得到一些关心。', subject: currentUser };
         break;
       case 'help':
         targetTab = 'daily';
-        newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'TASK', content: '我现在需要一些紧急帮助，有人有空吗？', status: 'TODO', priority: 'URGENT', assignees: [], reactions: [], comments: [], subject: currentUser };
+        newPost = { type: 'TASK', content: '我现在需要一些紧急帮助，有人有空吗？', status: 'TODO', priority: 'URGENT', subject: currentUser };
         break;
       case 'meeting':
         targetTab = 'daily';
-        newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'APPOINTMENT', content: '我们开个会讨论一下事情吧，大家什么时候有空？', status: 'TODO', priority: 'NORMAL', assignees: [], reactions: [], comments: [] };
+        newPost = { type: 'APPOINTMENT', content: '我们开个会讨论一下事情吧，大家什么时候有空？', status: 'TODO', priority: 'NORMAL' };
         break;
       case 'meal_suggestion':
         targetTab = 'daily';
-        newPost = { author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type: 'MEAL_SUGGESTION', content: '晚餐吃什么好呢？我没什么头绪，大家有什么想法吗？', assignees: [], reactions: [], comments: [] };
+        newPost = { type: 'MEAL_SUGGESTION', content: '晚餐吃什么好呢？我没什么头绪，大家有什么想法吗？' };
         break;
     }
 
@@ -323,8 +346,8 @@ export class AppComponent implements OnInit, OnDestroy {
         default: type = 'TASK'; break;
     }
 
-    const newPost: Omit<Post, 'id'> = {
-        author: currentUser.name, authorAvatar: currentUser.avatar, timestamp: '刚刚', type, content, assignees: [], reactions: [], comments: [],
+    const newPost: Omit<Post, 'id' | 'author' | 'authorAvatar' | 'timestamp' | 'reactions' | 'comments' | 'assignees'> = {
+        type, content,
         status: type === 'TASK' ? 'TODO' : undefined,
         priority: type === 'TASK' ? 'NORMAL' : undefined,
         subject: subject,
@@ -384,8 +407,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isSavingHealthLog.set(true);
 
     const formValue = this.newHealthLogForm.value;
-    const newLogData: Omit<HealthLog, 'id' | 'timestamp'> = {
-        author: currentUser.name,
+    const newLogData: Omit<HealthLog, 'id' | 'timestamp' | 'author'> = {
         content: formValue.content!,
         mood: formValue.mood || undefined,
         environmentalContext: this.currentEnvironmentalContext() ?? undefined,
