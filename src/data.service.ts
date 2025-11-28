@@ -1,5 +1,3 @@
-
-
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo, InventoryItemComment } from './types';
@@ -7,13 +5,14 @@ import { of, Observable, throwError, forkJoin } from 'rxjs';
 import { tap, catchError, map, switchMap, delay } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from './config';
 import { MOCK_POSTS, MOCK_INVENTORY, MOCK_HEALTH_LOGS } from './mock-data';
-import { FAMILY_MEMBERS } from './auth.service';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
     private http: HttpClient = inject(HttpClient);
+    private authService: AuthService = inject(AuthService);
     
     posts = signal<Post[]>([]);
     inventory = signal<InventoryItem[]>([]);
@@ -29,8 +28,14 @@ export class DataService {
 
     getPosts(): Observable<Post[]> {
         if (USE_MOCK_API) {
-            this.posts.set(MOCK_POSTS);
-            return of(MOCK_POSTS).pipe(delay(250));
+            const familyId = this.authService.activeFamily()?.id;
+            // Only show mock posts for the demo family
+            if (familyId === 'fam_demo') {
+                this.posts.set(MOCK_POSTS);
+                return of(MOCK_POSTS).pipe(delay(250));
+            }
+            this.posts.set([]);
+            return of([]).pipe(delay(250));
         }
         return this.http.get<Post[]>(`${API_BASE_URL}/posts`).pipe(
             tap((posts: Post[]) => this.posts.set(posts)),
@@ -42,8 +47,10 @@ export class DataService {
     }
     
     addPost(postData: Omit<Post, 'id' | 'author' | 'authorAvatar' | 'timestamp' | 'reactions' | 'comments' | 'assignees'>): Observable<Post> {
+        const currentUser = this.authService.currentUser();
+        if (!currentUser) return throwError(() => new Error('User not logged in'));
+
         if (USE_MOCK_API) {
-            const currentUser = FAMILY_MEMBERS.find(m => m.name === '我')!;
             const newPost: Post = {
                 id: Date.now(),
                 author: currentUser.name,
@@ -268,8 +275,13 @@ export class DataService {
     // --- Health Log Methods ---
     getHealthLogs(): Observable<HealthLog[]> {
       if (USE_MOCK_API) {
-        this.healthLogs.set(MOCK_HEALTH_LOGS);
-        return of(MOCK_HEALTH_LOGS).pipe(delay(150));
+        const familyId = this.authService.activeFamily()?.id;
+        if(familyId === 'fam_demo') {
+            this.healthLogs.set(MOCK_HEALTH_LOGS);
+            return of(MOCK_HEALTH_LOGS).pipe(delay(150));
+        }
+        this.healthLogs.set([]);
+        return of([]).pipe(delay(150));
       }
       return this.http.get<HealthLog[]>(`${API_BASE_URL}/health-logs`).pipe(
         tap((logs: HealthLog[]) => this.healthLogs.set(logs)),
@@ -281,8 +293,10 @@ export class DataService {
     }
 
     addHealthLog(logData: Omit<HealthLog, 'id' | 'timestamp' | 'author'>): Observable<HealthLog> {
+        const currentUser = this.authService.currentUser();
+        if (!currentUser) return throwError(() => new Error('User not logged in'));
+
         if (USE_MOCK_API) {
-            const currentUser = FAMILY_MEMBERS.find(m => m.name === '我')!;
             const newLog: HealthLog = {
                 id: Date.now(),
                 author: currentUser.name,
@@ -306,8 +320,13 @@ export class DataService {
     // --- Inventory Methods ---
     getInventory(): Observable<InventoryItem[]> {
       if (USE_MOCK_API) {
-        this.inventory.set(MOCK_INVENTORY);
-        return of(MOCK_INVENTORY).pipe(delay(200));
+        const familyId = this.authService.activeFamily()?.id;
+        if (familyId === 'fam_demo') {
+            this.inventory.set(MOCK_INVENTORY);
+            return of(MOCK_INVENTORY).pipe(delay(200));
+        }
+        this.inventory.set([]);
+        return of([]).pipe(delay(200));
       }
       return this.http.get<InventoryItem[]>(`${API_BASE_URL}/inventory`).pipe(
         tap((items: InventoryItem[]) => this.inventory.set(items)),

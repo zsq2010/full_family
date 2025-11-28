@@ -1,5 +1,3 @@
-
-
 import { Component, ChangeDetectionStrategy, signal, OnInit, OnDestroy, computed, ElementRef, viewChild, inject, effect } from '@angular/core';
 import { NgOptimizedImage, DecimalPipe, DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
@@ -7,9 +5,9 @@ import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
 
 import { API_KEY } from './config';
-import { AuthService, FAMILY_MEMBERS } from './auth.service';
+import { AuthService } from './auth.service';
 import { DataService } from './data.service';
-import { Post, Assignee, ReactionType, PostType, NeedStatus, Priority, InventoryItem, InventoryStatus, InventoryCategory, HealthLog, Mood, EnvironmentalContext } from './types';
+import { Post, Assignee, ReactionType, PostType, NeedStatus, Priority, InventoryItem, InventoryStatus, InventoryCategory, HealthLog, Mood, EnvironmentalContext, Family } from './types';
 
 // --- AI 配置 ---
 // API 密钥现在于 src/config.ts 文件中配置。
@@ -25,6 +23,7 @@ interface QuickLogOption {
   emoji: string;
 }
 type EnvironmentState = 'idle' | 'loading' | 'success' | 'error';
+type AuthView = 'login' | 'register';
 
 @Component({
   selector: 'app-root',
@@ -39,18 +38,21 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Auth & Data State ---
   loggedInUser = this.authService.currentUser;
+  userFamilies = this.authService.userFamilies;
+  activeFamily = this.authService.activeFamily;
   posts = this.dataService.posts;
   inventory = this.dataService.inventory;
   healthLogs = this.dataService.healthLogs;
   loginError = signal<string | null>(null);
+  registerError = signal<string | null>(null);
+  familyError = signal<string | null>(null);
   isLoggingIn = signal(false);
-
-  loginForm = new FormGroup({
-    username: new FormControl('', Validators.required),
-    password: new FormControl('', Validators.required),
-  });
-
+  isRegistering = signal(false);
+  isCreatingFamily = signal(false);
+  isJoiningFamily = signal(false);
+  
   // --- UI State ---
+  authView = signal<AuthView>('login');
   readonly currentYear = new Date().getFullYear();
   readonly reactionTypes: ReactionType[] = ['ILL_DO_IT', 'ILL_JOIN', 'GOT_IT'];
   private timer: number | undefined;
@@ -71,6 +73,31 @@ export class AppComponent implements OnInit, OnDestroy {
   currentEnvironmentalContext = signal<EnvironmentalContext | null>(null);
   environmentState = signal<EnvironmentState>('idle');
   environmentDataError = signal<string | null>(null);
+  
+  // --- Family Gate & Switcher UI State ---
+  isFamilySwitcherOpen = signal(false);
+  showCreateFamilyForm = signal(false);
+  showJoinFamilyForm = signal(false);
+
+  // --- Forms ---
+  loginForm = new FormGroup({
+    username: new FormControl('', Validators.required),
+    password: new FormControl('', Validators.required),
+  });
+
+  registerForm = new FormGroup({
+    username: new FormControl('', [Validators.required, Validators.minLength(3)]),
+    displayName: new FormControl('', [Validators.required]),
+    password: new FormControl('', [Validators.required, Validators.minLength(6)]),
+  });
+  
+  createFamilyForm = new FormGroup({
+    familyName: new FormControl('', Validators.required)
+  });
+
+  joinFamilyForm = new FormGroup({
+    inviteCode: new FormControl('', Validators.required)
+  });
 
   newItemForm = new FormGroup({
     name: new FormControl('', [Validators.required]),
@@ -113,9 +140,9 @@ export class AppComponent implements OnInit, OnDestroy {
       console.warn("Google Gemini API key not found. Please add it to src/config.ts. AI features will be disabled.");
     }
 
-    // React to login/logout events to fetch or clear data.
+    // React to family changes to fetch or clear data.
     effect(() => {
-      if (this.loggedInUser()) {
+      if (this.activeFamily()) {
         this.dataService.getPosts().subscribe();
         this.dataService.getInventory().subscribe();
         this.dataService.getHealthLogs().subscribe();
@@ -152,12 +179,70 @@ export class AppComponent implements OnInit, OnDestroy {
     
     this.authService.login(username!, password!).subscribe({
       next: () => {
-        // Successful login, effect will trigger data fetch.
+        // Successful login, effect will trigger data fetch if family exists.
         this.isLoggingIn.set(false);
       },
-      error: () => {
-        this.loginError.set('无效的用户名或密码。');
+      error: (err) => {
+        this.loginError.set(err.message || '无效的用户名或密码。');
         this.isLoggingIn.set(false);
+      }
+    });
+  }
+
+  onRegisterSubmit(): void {
+    if (this.registerForm.invalid || this.isRegistering()) {
+      return;
+    }
+    this.isRegistering.set(true);
+    this.registerError.set(null);
+    const { username, displayName, password } = this.registerForm.value;
+
+    this.authService.register(username!, displayName!, password!).subscribe({
+      next: () => {
+        // Successfully registered and logged in. User will be directed to family gate.
+        this.isRegistering.set(false);
+      },
+      error: (err) => {
+        this.registerError.set(err.message || '注册失败，请稍后再试。');
+        this.isRegistering.set(false);
+      }
+    });
+  }
+
+  onCreateFamilySubmit(): void {
+    if (this.createFamilyForm.invalid || this.isCreatingFamily()) return;
+    this.isCreatingFamily.set(true);
+    this.familyError.set(null);
+    
+    this.authService.createFamily(this.createFamilyForm.value.familyName!).subscribe({
+      next: () => {
+        this.isCreatingFamily.set(false);
+        this.showCreateFamilyForm.set(false); // Hide form on success
+        this.isFamilySwitcherOpen.set(false); // Close switcher if open
+        this.createFamilyForm.reset();
+      },
+      error: (err) => {
+        this.familyError.set(err.message || '创建家庭失败。');
+        this.isCreatingFamily.set(false);
+      }
+    });
+  }
+
+  onJoinFamilySubmit(): void {
+    if (this.joinFamilyForm.invalid || this.isJoiningFamily()) return;
+    this.isJoiningFamily.set(true);
+    this.familyError.set(null);
+
+    this.authService.joinFamily(this.joinFamilyForm.value.inviteCode!).subscribe({
+      next: () => {
+        this.isJoiningFamily.set(false);
+        this.showJoinFamilyForm.set(false); // Hide form on success
+        this.isFamilySwitcherOpen.set(false); // Close switcher if open
+        this.joinFamilyForm.reset();
+      },
+      error: (err) => {
+        this.familyError.set(err.message || '加入家庭失败，请检查邀请码。');
+        this.isJoiningFamily.set(false);
       }
     });
   }
@@ -165,9 +250,23 @@ export class AppComponent implements OnInit, OnDestroy {
   logout(): void {
     this.authService.logout().subscribe(() => {
       this.loginForm.reset();
+      this.registerForm.reset();
+      this.createFamilyForm.reset();
+      this.joinFamilyForm.reset();
+      this.authView.set('login');
       this.activeTab.set('home');
-      // Effect will handle clearing data.
+      this.isFamilySwitcherOpen.set(false);
     });
+  }
+
+  onSwitchFamily(familyId: string): void {
+    if (this.activeFamily()?.id === familyId) {
+        this.isFamilySwitcherOpen.set(false);
+        return;
+    }
+    this.authService.switchFamily(familyId);
+    this.isFamilySwitcherOpen.set(false);
+    this.activeHomeTab.set('all'); // Reset home tab on switch
   }
 
   // --- UI Navigation & Interaction ---
@@ -560,8 +659,9 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   
     this.dataService.updatePostAiSuggestion(post.id, { isLoading: true });
-  
-    const familyProfileString = FAMILY_MEMBERS.map(m => `- ${m.name} (年龄: ${m.age})`).join('\n');
+    
+    const familyMembers = this.activeFamily()?.members ?? [];
+    const familyProfileString = familyMembers.map(m => `- ${m.name} (年龄: ${m.age})`).join('\n');
     const commentsString = post.comments.map(c => `- ${c.author}: "${c.content}"`).join('\n');
     const initialRequest = post.content;
   

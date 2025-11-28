@@ -1,42 +1,138 @@
 <div class="font-sans">
   @if (!loggedInUser()) {
-    <!-- Login Screen -->
+    <!-- Login/Register Screen -->
     <div class="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
       <h1 class="text-3xl font-bold text-slate-700 mb-2">家事</h1>
-      <p class="text-slate-500 mb-8">请使用您的账户登录</p>
-      
-      <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="w-full max-w-sm space-y-4">
-        <div>
-          <label for="username" class="block text-sm font-medium text-slate-700">用户名</label>
-          <input id="username" type="text" formControlName="username" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
-        </div>
-        <div>
-          <label for="password" class="block text-sm font-medium text-slate-700">密码</label>
-          <input id="password" type="password" formControlName="password" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
-        </div>
-        
-        @if (loginError()) {
-          <p class="text-sm text-red-600">{{ loginError() }}</p>
-        }
 
-        <button type="submit" [disabled]="loginForm.invalid || isLoggingIn()" class="w-full flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
-          @if(isLoggingIn()) {
-            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>登录中...</span>
-          } @else {
-            <span>登录</span>
+      @if (authView() === 'login') {
+        <!-- Login Form -->
+        <p class="text-slate-500 mb-8">请使用您的账户登录</p>
+        <form [formGroup]="loginForm" (ngSubmit)="onLoginSubmit()" class="w-full max-w-sm space-y-4">
+          <div>
+            <label for="username" class="block text-sm font-medium text-slate-700">用户名</label>
+            <input id="username" type="text" formControlName="username" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+          </div>
+          <div>
+            <label for="password" class="block text-sm font-medium text-slate-700">密码</label>
+            <input id="password" type="password" formControlName="password" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+          </div>
+          
+          @if (loginError()) {
+            <p class="text-sm text-red-600">{{ loginError() }}</p>
           }
-        </button>
-      </form>
 
-      <div class="mt-6 text-xs text-slate-500 text-center p-3 bg-slate-200/80 rounded-lg w-full max-w-sm">
-        <p class="font-bold">测试账户:</p>
-        <p>用户名: me, mom, dad, alex</p>
-        <p>密码: password123</p>
-      </div>
+          <button type="submit" [disabled]="loginForm.invalid || isLoggingIn()" class="w-full flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+            @if(isLoggingIn()) {
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>登录中...</span>
+            } @else {
+              <span>登录</span>
+            }
+          </button>
+        </form>
+        <p class="mt-6 text-sm">
+          还没有账户？ <button (click)="authView.set('register'); loginError.set(null);" class="font-medium text-sky-600 hover:text-sky-500">立即注册</button>
+        </p>
+
+        <div class="mt-6 text-xs text-slate-500 text-center p-3 bg-slate-200/80 rounded-lg w-full max-w-sm">
+          <p class="font-bold">演示账户 (默认家庭):</p>
+          <p>用户名: me, mom, dad, alex</p>
+          <p>密码: password123</p>
+        </div>
+      } @else {
+        <!-- Register Form -->
+        <p class="text-slate-500 mb-8">创建一个新账户</p>
+        <form [formGroup]="registerForm" (ngSubmit)="onRegisterSubmit()" class="w-full max-w-sm space-y-4">
+          <div>
+            <label for="reg-username" class="block text-sm font-medium text-slate-700">用户名 <span class="text-slate-400">(用于登录)</span></label>
+            <input id="reg-username" type="text" formControlName="username" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+          </div>
+          <div>
+            <label for="reg-displayName" class="block text-sm font-medium text-slate-700">您在家里的称呼 <span class="text-slate-400">(例如: 妈妈)</span></label>
+            <input id="reg-displayName" type="text" formControlName="displayName" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+          </div>
+          <div>
+            <label for="reg-password" class="block text-sm font-medium text-slate-700">密码</label>
+            <input id="reg-password" type="password" formControlName="password" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" required>
+          </div>
+          
+          @if (registerError()) {
+            <p class="text-sm text-red-600">{{ registerError() }}</p>
+          }
+
+          <button type="submit" [disabled]="registerForm.invalid || isRegistering()" class="w-full flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+            @if(isRegistering()) {
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>注册中...</span>
+            } @else {
+              <span>注册</span>
+            }
+          </button>
+        </form>
+         <p class="mt-6 text-sm">
+          已有账户？ <button (click)="authView.set('login'); registerError.set(null);" class="font-medium text-sky-600 hover:text-sky-500">返回登录</button>
+        </p>
+      }
+    </div>
+  } @else if (!activeFamily()) {
+    <!-- Family Gate Screen -->
+    <div class="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
+        <div class="w-full max-w-md text-center">
+            <h1 class="text-2xl font-bold text-slate-800">欢迎, {{ loggedInUser()?.name }}!</h1>
+            <p class="mt-2 text-slate-600">您还不属于任何家庭。请创建一个新家庭或加入一个现有的家庭来开始使用。</p>
+
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Create Family Card -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                    <h2 class="font-bold text-lg text-slate-800">创建我的家庭</h2>
+                    <p class="text-sm text-slate-500 mt-1">创建一个新的空间，邀请您的家人加入。</p>
+                    <button (click)="showCreateFamilyForm.set(true); showJoinFamilyForm.set(false)" class="mt-4 w-full text-sm font-semibold px-4 py-2 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">
+                        开始创建
+                    </button>
+                </div>
+
+                <!-- Join Family Card -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                    <h2 class="font-bold text-lg text-slate-800">加入一个家庭</h2>
+                    <p class="text-sm text-slate-500 mt-1">使用家人分享的邀请码加入他们的家庭。</p>
+                    <button (click)="showJoinFamilyForm.set(true); showCreateFamilyForm.set(false)" class="mt-4 w-full text-sm font-semibold px-4 py-2 rounded-md transition-colors bg-emerald-500 text-white hover:bg-emerald-600">
+                        使用邀请码
+                    </button>
+                </div>
+            </div>
+
+            <!-- Forms shown conditionally -->
+            @if(showCreateFamilyForm()) {
+              <form [formGroup]="createFamilyForm" (ngSubmit)="onCreateFamilySubmit()" class="mt-6 p-4 bg-slate-200/60 rounded-lg animate-fade-in-down space-y-3">
+                  <h3 class="font-semibold">为您的家庭取个名字</h3>
+                  <input type="text" formControlName="familyName" placeholder="例如：快乐一家" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+                  <button type="submit" [disabled]="createFamilyForm.invalid || isCreatingFamily()" class="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-md text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400">
+                     @if(isCreatingFamily()){ <span>创建中...</span> } @else { <span>创建家庭</span> }
+                  </button>
+              </form>
+            }
+
+            @if(showJoinFamilyForm()) {
+              <form [formGroup]="joinFamilyForm" (ngSubmit)="onJoinFamilySubmit()" class="mt-6 p-4 bg-slate-200/60 rounded-lg animate-fade-in-down space-y-3">
+                  <h3 class="font-semibold">输入家庭邀请码</h3>
+                  <input type="text" formControlName="inviteCode" placeholder="粘贴邀请码" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+                  <button type="submit" [disabled]="joinFamilyForm.invalid || isJoiningFamily()" class="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-md text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400">
+                      @if(isJoiningFamily()){ <span>加入中...</span> } @else { <span>确认加入</span> }
+                  </button>
+              </form>
+            }
+            @if(familyError()) {
+              <p class="mt-4 text-sm text-red-600">{{ familyError() }}</p>
+            }
+
+            <button (click)="logout()" class="mt-8 text-sm text-slate-500 hover:text-slate-800 transition-colors">登出</button>
+        </div>
     </div>
   } @else {
     <!-- Main App Content -->
@@ -47,7 +143,75 @@
         <div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
           <!-- Sticky Home Screen Tabs -->
           <nav #mainNav class="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-200">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-4">
+               <!-- Family Switcher -->
+              <div class="relative">
+                <button (click)="isFamilySwitcherOpen.set(!isFamilySwitcherOpen())" class="flex items-center gap-2 text-left p-2 rounded-lg hover:bg-slate-200 transition-colors">
+                  <img [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="32" height="32" class="w-8 h-8 rounded-full object-cover">
+                  <div>
+                    <span class="text-sm font-bold text-slate-800 truncate">{{ activeFamily()?.name }}</span>
+                    <span class="text-xs text-slate-500">切换家庭</span>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-slate-500 transition-transform" [class.rotate-180]="isFamilySwitcherOpen()">
+                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                @if(isFamilySwitcherOpen()) {
+                  <div class="absolute top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 p-2 z-50 animate-fade-in-down">
+                    <p class="text-xs font-semibold text-slate-400 px-2 pt-1 pb-2">切换家庭</p>
+                    <div class="flex flex-col gap-1">
+                      @for(family of userFamilies(); track family.id) {
+                        <button (click)="onSwitchFamily(family.id)" class="w-full text-left flex items-center gap-3 p-2 rounded-lg transition-colors" [class]="family.id === activeFamily()?.id ? 'bg-sky-100 text-sky-800' : 'hover:bg-slate-100'">
+                          <span class="w-6 h-6 rounded-md bg-slate-200 flex items-center justify-center font-bold text-slate-600 text-xs">{{ family.name.charAt(0) }}</span>
+                          <span class="flex-1 font-semibold text-sm truncate">{{ family.name }}</span>
+                          @if(family.id === activeFamily()?.id) {
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-sky-600">
+                              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.052-.143Z" clip-rule="evenodd" />
+                            </svg>
+                          }
+                        </button>
+                      }
+                    </div>
+                    <div class="my-2 border-t border-slate-200"></div>
+                     <!-- Create/Join Forms in Dropdown -->
+                    @if(showCreateFamilyForm()) {
+                      <form [formGroup]="createFamilyForm" (ngSubmit)="onCreateFamilySubmit()" class="p-2 bg-slate-100/80 rounded-lg animate-fade-in-down space-y-2 text-sm">
+                          <h3 class="font-semibold text-slate-700">为您的家庭取个名字</h3>
+                          <input type="text" formControlName="familyName" placeholder="例如：快乐一家" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                          <div class="flex gap-2">
+                            <button type="submit" [disabled]="createFamilyForm.invalid || isCreatingFamily()" class="flex-1 flex justify-center items-center gap-2 py-1.5 px-3 rounded-md font-medium text-white bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400">
+                              @if(isCreatingFamily()){ <span>创建中...</span> } @else { <span>创建</span> }
+                            </button>
+                            <button type="button" (click)="showCreateFamilyForm.set(false)" class="flex-1 py-1.5 px-3 rounded-md font-medium bg-slate-200 hover:bg-slate-300">取消</button>
+                          </div>
+                      </form>
+                    } @else if(showJoinFamilyForm()) {
+                       <form [formGroup]="joinFamilyForm" (ngSubmit)="onJoinFamilySubmit()" class="p-2 bg-slate-100/80 rounded-lg animate-fade-in-down space-y-2 text-sm">
+                          <h3 class="font-semibold text-slate-700">输入家庭邀请码</h3>
+                          <input type="text" formControlName="inviteCode" placeholder="粘贴邀请码" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                           <div class="flex gap-2">
+                              <button type="submit" [disabled]="joinFamilyForm.invalid || isJoiningFamily()" class="flex-1 flex justify-center items-center gap-2 py-1.5 px-3 rounded-md font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400">
+                                @if(isJoiningFamily()){ <span>加入中...</span> } @else { <span>加入</span> }
+                              </button>
+                              <button type="button" (click)="showJoinFamilyForm.set(false)" class="flex-1 py-1.5 px-3 rounded-md font-medium bg-slate-200 hover:bg-slate-300">取消</button>
+                           </div>
+                      </form>
+                    } @else {
+                      <div class="flex flex-col gap-1 text-sm font-semibold">
+                        <button (click)="showCreateFamilyForm.set(true)" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100">创建新家庭</button>
+                        <button (click)="showJoinFamilyForm.set(true)" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100">加入家庭</button>
+                      </div>
+                    }
+                    @if(familyError()) {
+                      <p class="mt-2 text-xs text-center text-red-600">{{ familyError() }}</p>
+                    }
+                    <div class="my-2 border-t border-slate-200"></div>
+                    <button (click)="logout()" class="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 text-sm font-semibold text-rose-600">
+                      登出
+                    </button>
+                  </div>
+                }
+              </div>
               <div class="bg-slate-200/80 p-1 rounded-lg flex flex-wrap gap-1 text-xs font-bold">
                 <button (click)="setActiveHomeTab('all')" [class]="activeHomeTab() === 'all' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
                   全部
@@ -62,13 +226,6 @@
                   知识分享
                 </button>
               </div>
-               <button (click)="logout()" class="p-2 rounded-full hover:bg-slate-200 transition-colors" aria-label="切换用户">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-slate-600">
-                    <path fill-rule="evenodd" d="M2 3.25A1.25 1.25 0 0 1 3.25 2h6.5A1.25 1.25 0 0 1 11 3.25v.5a.75.75 0 0 1-1.5 0v-.5a.25.25 0 0 0-.25-.25h-5.5a.25.25 0 0 0-.25.25v13.5c0 .138.112.25.25.25h5.5a.25.25 0 0 0 .25-.25v-.5a.75.75 0 0 1 1.5 0v.5A1.25 1.25 0 0 1 9.75 18h-6.5A1.25 1.25 0 0 1 2 16.75V3.25Z" clip-rule="evenodd" />
-                    <path fill-rule="evenodd" d="M13.44 10.78a.75.75 0 0 0 0-1.56l-3.25-1.5a.75.75 0 0 0-.94 1.28L10.44 10l-1.19 1.53a.75.75 0 0 0 .94 1.28l3.25-1.5Z" clip-rule="evenodd" />
-                    <path fill-rule="evenodd" d="M16.25 10a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0 0 1.5h5.5a.75.75 0 0 0 .75-.75Z" clip-rule="evenodd" />
-                  </svg>
-                </button>
             </div>
           </nav>
 
@@ -295,6 +452,11 @@
           } @else {
             <div class="text-center py-16 text-slate-500">
               <p>这里还没有内容。</p>
+              @if(activeFamily()?.inviteCode) {
+                 <p class="mt-4 text-sm">邀请家人加入 <span class="font-bold text-slate-700">{{ activeFamily()?.name }}</span>！</p>
+                 <p class="mt-1 text-xs text-slate-400">分享您的邀请码:</p>
+                 <p class="mt-1 text-lg font-mono p-2 bg-slate-200 rounded-md inline-block">{{ activeFamily()?.inviteCode }}</p>
+              }
             </div>
           }
         </main>
@@ -617,15 +779,15 @@
             <div class="flex flex-col items-center">
                 <img priority [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="96" height="96" class="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg">
                 <h1 class="mt-4 text-3xl font-bold text-slate-800">{{ loggedInUser()!.name }}</h1>
-                <p class="mt-1 text-slate-500">家庭成员</p>
+                <p class="mt-1 text-slate-500">“{{ activeFamily()?.name }}”的成员</p>
                 <div class="mt-6 w-full max-w-xs bg-white p-4 rounded-lg shadow-sm border border-slate-100 text-sm">
                   <div class="flex justify-between">
                      <span class="text-slate-500">年龄</span>
                      <span class="font-semibold text-slate-700">{{ loggedInUser()!.age }} 岁</span>
                   </div>
                   <div class="flex justify-between mt-2 pt-2 border-t">
-                     <span class="text-slate-500">加入年份</span>
-                     <span class="font-semibold text-slate-700">{{ currentYear }}</span>
+                     <span class="text-slate-500">家庭邀请码</span>
+                     <span class="font-mono text-slate-700">{{ activeFamily()?.inviteCode }}</span>
                   </div>
                 </div>
 

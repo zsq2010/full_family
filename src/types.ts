@@ -25,6 +25,7 @@ export interface Comment {
 }
 
 export interface Assignee {
+  id: number;
   name: string;
   avatar: string;
   age?: number;
@@ -125,4 +126,27 @@ export interface HealthLog {
   content: string;
   mood?: Mood;
   environmentalContext?: EnvironmentalContext;
+}
+
+// --- New Types for Auth and Family Management ---
+export interface MockUser {
+  id: number;
+  username: string;
+  password?: string;
+  assigneeId: number;
+  familyIds: string[];
+}
+
+export interface MockFamily {
+  id: string;
+  name: string;
+  memberIds: number[];
+  inviteCode: string;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  members: Assignee[];
+  inviteCode: string;
 }
