@@ -1,9 +1,9 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Assignee, Family, MockFamily, MockUser } from './types';
+import { Assignee, Family, MockFamily, MockUser, AuthResponse } from './types';
 import { API_BASE_URL, USE_MOCK_API, DEV_AUTO_LOGIN, DEV_DEFAULT_USER } from './config';
 import { Observable, of, throwError, delay } from 'rxjs';
-import { tap, catchError } from 'rxjs';
+import { tap, catchError, map } from 'rxjs';
 
 // --- Mock Data Store ---
 // This will act as our in-memory database for the mock API.
@@ -29,6 +29,8 @@ const MOCK_USERS: MockUser[] = [
   { id: 104, username: 'alex', password: 'password123', assigneeId: 4, familyIds: ['fam_demo'] },
 ];
 
+const TOKEN_STORAGE_KEY = 'family-care-auth-token';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -37,28 +39,38 @@ export class AuthService {
   currentUser = signal<Assignee | null>(null);
   userFamilies = signal<Family[]>([]);
   activeFamily = signal<Family | null>(null);
+  private accessToken = signal<string | null>(null);
 
-  constructor() {}
+  constructor() {
+    this.accessToken.set(this.getToken());
+  }
+  
+  getToken(): string | null {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+  }
 
-  checkSession(): Observable<Assignee | null> {
+  checkSession(): Observable<AuthResponse | null> {
+    const token = this.getToken();
+    if (!token) {
+        this._clearSession();
+        return of(null);
+    }
+
     if (USE_MOCK_API) {
       if (DEV_AUTO_LOGIN) {
         const user = MOCK_USERS.find(u => u.username === DEV_DEFAULT_USER.toLowerCase());
         if (user) {
-          this._setSession(user);
-          return of(this.currentUser());
+          const authResponse = this._buildMockAuthResponse(user);
+          this._setSession(authResponse);
+          return of(authResponse);
         }
       }
       this._clearSession();
       return of(null);
     }
 
-    return this.http.get<any>(`${API_BASE_URL}/auth/me`).pipe(
-      tap(response => {
-        this.currentUser.set(response.user);
-        this.userFamilies.set(response.families);
-        this.activeFamily.set(response.families?.[0] ?? null);
-      }),
+    return this.http.get<AuthResponse>(`${API_BASE_URL}/auth/me`).pipe(
+      tap(response => this._setSession(response)),
       catchError(() => {
         this._clearSession();
         return of(null);
@@ -66,26 +78,23 @@ export class AuthService {
     );
   }
 
-  login(username: string, password: string): Observable<Assignee> {
+  login(username: string, password: string): Observable<AuthResponse> {
     if (USE_MOCK_API) {
       const user = MOCK_USERS.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
       if (user) {
-        this._setSession(user);
-        return of(this.currentUser()!).pipe(delay(500));
+        const authResponse = this._buildMockAuthResponse(user);
+        this._setSession(authResponse);
+        return of(authResponse).pipe(delay(500));
       }
       return throwError(() => new Error('无效的用户名或密码。')).pipe(delay(500));
     }
 
-    return this.http.post<any>(`${API_BASE_URL}/auth/login`, { username, password }).pipe(
-      tap(response => {
-        this.currentUser.set(response.user);
-        this.userFamilies.set(response.families);
-        this.activeFamily.set(response.families?.[0] ?? null);
-      })
+    return this.http.post<AuthResponse>(`${API_BASE_URL}/auth/login`, { username, password }).pipe(
+      tap(response => this._setSession(response))
     );
   }
 
-  register(username: string, displayName: string, password: string): Observable<Assignee> {
+  register(username: string, displayName: string, password: string): Observable<AuthResponse> {
     if (USE_MOCK_API) {
       if (MOCK_USERS.some(u => u.username.toLowerCase() === username.toLowerCase())) {
         return throwError(() => new Error('该用户名已被使用。')).pipe(delay(500));
@@ -108,17 +117,13 @@ export class AuthService {
       };
       MOCK_USERS.push(newUser);
       
-      this._setSession(newUser);
-      return of(this.currentUser()!).pipe(delay(500));
+      const authResponse = this._buildMockAuthResponse(newUser);
+      this._setSession(authResponse);
+      return of(authResponse).pipe(delay(500));
     }
     
-    return this.http.post<any>(`${API_BASE_URL}/auth/register`, { username, displayName, password }).pipe(
-      tap(response => {
-        this.currentUser.set(response.user);
-        // A new user won't have a family yet
-        this.userFamilies.set([]);
-        this.activeFamily.set(null);
-      })
+    return this.http.post<AuthResponse>(`${API_BASE_URL}/auth/register`, { username, displayName, password }).pipe(
+      tap(response => this._setSession(response))
     );
   }
 
@@ -193,13 +198,23 @@ export class AuthService {
     );
   }
 
-  switchFamily(familyId: string) {
-    const familyToActivate = this.userFamilies().find(f => f.id === familyId);
-    if (familyToActivate) {
-        this.activeFamily.set(familyToActivate);
-    } else {
-        console.error(`Attempted to switch to non-existent family ID: ${familyId}`);
+  switchFamily(familyId: string): Observable<AuthResponse> {
+    if (USE_MOCK_API) {
+        const user = MOCK_USERS.find(u => u.assigneeId === this.currentUser()?.id);
+        if (!user) return throwError(() => new Error('User not found'));
+        
+        const familyExists = this.userFamilies().some(f => f.id === familyId);
+        if (familyExists) {
+            const authResponse = this._buildMockAuthResponse(user, familyId);
+            this._setSession(authResponse);
+            return of(authResponse);
+        }
+        return throwError(() => new Error('Family not found'));
     }
+
+    return this.http.post<AuthResponse>(`${API_BASE_URL}/families/${familyId}/switch`, {}).pipe(
+        tap(response => this._setSession(response))
+    );
   }
 
   logout(): Observable<unknown> {
@@ -216,28 +231,41 @@ export class AuthService {
     );
   }
 
-  private _setSession(user: MockUser): void {
-    const assignee = ALL_ASSIGNEES.find(a => a.id === user.assigneeId);
-    this.currentUser.set(assignee || null);
-
-    if (user.familyIds && user.familyIds.length > 0) {
-      const userFamilies = MOCK_FAMILIES
-        .filter(f => user.familyIds.includes(f.id))
-        .map(mockFamily => {
-          const members = mockFamily.memberIds.map(id => ALL_ASSIGNEES.find(a => a.id === id)!).filter(Boolean);
-          return { ...mockFamily, members };
-        });
-      this.userFamilies.set(userFamilies);
-      this.activeFamily.set(userFamilies[0] ?? null);
-    } else {
-      this.userFamilies.set([]);
-      this.activeFamily.set(null);
-    }
+  private _setSession(response: AuthResponse): void {
+    localStorage.setItem(TOKEN_STORAGE_KEY, response.accessToken);
+    this.accessToken.set(response.accessToken);
+    this.currentUser.set(response.user);
+    this.userFamilies.set(response.families);
+    
+    const activeFam = response.families.find(f => f.id === response.activeFamilyId) ?? response.families[0] ?? null;
+    this.activeFamily.set(activeFam);
   }
 
   private _clearSession(): void {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    this.accessToken.set(null);
     this.currentUser.set(null);
     this.userFamilies.set([]);
     this.activeFamily.set(null);
+  }
+  
+  private _buildMockAuthResponse(user: MockUser, activeFamilyIdOverride?: string): AuthResponse {
+    const assignee = ALL_ASSIGNEES.find(a => a.id === user.assigneeId)!;
+    
+    const families: Family[] = MOCK_FAMILIES
+      .filter(f => user.familyIds.includes(f.id))
+      .map(mockFamily => ({
+        ...mockFamily,
+        members: mockFamily.memberIds.map(id => ALL_ASSIGNEES.find(a => a.id === id)!).filter(Boolean)
+      }));
+
+    const activeFamilyId = activeFamilyIdOverride ?? (families.length > 0 ? families[0].id : null);
+
+    return {
+      accessToken: `mock-token-for-${user.username}-${Date.now()}`,
+      user: assignee,
+      families: families,
+      activeFamilyId: activeFamilyId,
+    };
   }
 }

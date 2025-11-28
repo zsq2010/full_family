@@ -15,7 +15,7 @@ export const USE_MOCK_API = true;
 
 // 你的后端 API 的基础 URL。
 // 仅在 USE_MOCK_API 设置为 `false` 时使用。
-export const API_BASE_URL = 'http://localhost:8080/api';
+export const API_BASE_URL = 'http://localhost:8080/api/v1';
 
 // 3. 开发设置
 // 注意：这些设置仅在 `USE_MOCK_API` 为 `true` 时生效。

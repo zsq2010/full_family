@@ -25,6 +25,15 @@ export class DataService {
       this.inventory.set([]);
       this.healthLogs.set([]);
     }
+    
+    private getFamilyApiUrl(endpoint: string): string | null {
+        const familyId = this.authService.activeFamily()?.id;
+        if (!familyId) {
+            console.error(`Cannot build API URL for ${endpoint}: Active family ID is not set.`);
+            return null;
+        }
+        return `${API_BASE_URL}/families/${familyId}/${endpoint}`;
+    }
 
     getPosts(): Observable<Post[]> {
         if (USE_MOCK_API) {
@@ -37,7 +46,10 @@ export class DataService {
             this.posts.set([]);
             return of([]).pipe(delay(250));
         }
-        return this.http.get<Post[]>(`${API_BASE_URL}/posts`).pipe(
+        const url = this.getFamilyApiUrl('posts');
+        if (!url) return of([]);
+        
+        return this.http.get<Post[]>(url).pipe(
             tap((posts: Post[]) => this.posts.set(posts)),
             catchError(err => {
                 console.error('Failed to fetch posts', err);
@@ -64,7 +76,11 @@ export class DataService {
             this.posts.update(currentPosts => [newPost, ...currentPosts]);
             return of(newPost).pipe(delay(300));
         }
-        return this.http.post<Post>(`${API_BASE_URL}/posts`, postData).pipe(
+        
+        const url = this.getFamilyApiUrl('posts');
+        if (!url) return throwError(() => new Error('Active family not set'));
+
+        return this.http.post<Post>(url, postData).pipe(
             tap((createdPost: Post) => {
                 this.posts.update(currentPosts => [createdPost, ...currentPosts]);
             }),
@@ -92,7 +108,11 @@ export class DataService {
         }));
         return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
       }
-      return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/reactions`, { type }).pipe(
+      
+      const url = this.getFamilyApiUrl(`posts/${postId}/reactions`);
+      if (!url) return throwError(() => new Error('Active family not set'));
+      
+      return this.http.post<Post>(url, { type }).pipe(
         tap((updatedPost: Post) => {
             this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
         }),
@@ -122,7 +142,11 @@ export class DataService {
             }));
             return updatedPost ? of(updatedPost).pipe(delay(200)) : throwError(() => new Error('Post not found'));
         }
-        return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/comments`, { content }).pipe(
+        
+        const url = this.getFamilyApiUrl(`posts/${postId}/comments`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+
+        return this.http.post<Post>(url, { content }).pipe(
             tap((updatedPost: Post) => {
                 this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
             }),
@@ -145,7 +169,11 @@ export class DataService {
             }));
             return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
         }
-        return this.http.delete<Post>(`${API_BASE_URL}/posts/${postId}/comments/${commentId}`).pipe(
+        
+        const url = this.getFamilyApiUrl(`posts/${postId}/comments/${commentId}`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+
+        return this.http.delete<Post>(url).pipe(
             tap((updatedPost: Post) => {
                 this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
             }),
@@ -168,7 +196,11 @@ export class DataService {
         }));
         return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
       }
-      return this.http.patch<Post>(`${API_BASE_URL}/posts/${postId}`, { status: 'DONE' }).pipe(
+      
+      const url = this.getFamilyApiUrl(`posts/${postId}`);
+      if (!url) return throwError(() => new Error('Active family not set'));
+      
+      return this.http.patch<Post>(url, { status: 'DONE' }).pipe(
         tap((updatedPost: Post) => {
             this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
         }),
@@ -283,7 +315,11 @@ export class DataService {
         this.healthLogs.set([]);
         return of([]).pipe(delay(150));
       }
-      return this.http.get<HealthLog[]>(`${API_BASE_URL}/health-logs`).pipe(
+      
+      const url = this.getFamilyApiUrl('health-logs');
+      if (!url) return of([]);
+
+      return this.http.get<HealthLog[]>(url).pipe(
         tap((logs: HealthLog[]) => this.healthLogs.set(logs)),
         catchError(err => {
           console.error('Failed to fetch health logs', err);
@@ -306,7 +342,11 @@ export class DataService {
             this.healthLogs.update(logs => [newLog, ...logs]);
             return of(newLog).pipe(delay(200));
         }
-        return this.http.post<HealthLog>(`${API_BASE_URL}/health-logs`, logData).pipe(
+        
+        const url = this.getFamilyApiUrl('health-logs');
+        if (!url) return throwError(() => new Error('Active family not set'));
+
+        return this.http.post<HealthLog>(url, logData).pipe(
           tap((createdLog: HealthLog) => {
             this.healthLogs.update(currentLogs => [createdLog, ...currentLogs]);
           }),
@@ -328,7 +368,11 @@ export class DataService {
         this.inventory.set([]);
         return of([]).pipe(delay(200));
       }
-      return this.http.get<InventoryItem[]>(`${API_BASE_URL}/inventory`).pipe(
+      
+      const url = this.getFamilyApiUrl('inventory');
+      if (!url) return of([]);
+      
+      return this.http.get<InventoryItem[]>(url).pipe(
         tap((items: InventoryItem[]) => this.inventory.set(items)),
         catchError(err => {
           console.error('Failed to fetch inventory', err);
@@ -348,7 +392,11 @@ export class DataService {
         this.inventory.update(items => [newItem, ...items]);
         return of(newItem).pipe(delay(300));
       }
-      return this.http.post<InventoryItem>(`${API_BASE_URL}/inventory`, itemData).pipe(
+
+      const url = this.getFamilyApiUrl('inventory');
+      if (!url) return throwError(() => new Error('Active family not set'));
+
+      return this.http.post<InventoryItem>(url, itemData).pipe(
         tap((createdItem: InventoryItem) => {
           this.inventory.update(currentItems => [createdItem, ...currentItems]);
         }),
@@ -371,7 +419,11 @@ export class DataService {
             }));
             return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
         }
-        return this.http.patch<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}`, itemData).pipe(
+        
+        const url = this.getFamilyApiUrl(`inventory/${itemId}`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+        
+        return this.http.patch<InventoryItem>(url, itemData).pipe(
             tap((updatedItem: InventoryItem) => {
                 this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
             }),
@@ -387,7 +439,11 @@ export class DataService {
             this.inventory.update(items => items.filter(i => i.id !== itemId));
             return of(undefined).pipe(delay(100));
         }
-        return this.http.delete<void>(`${API_BASE_URL}/inventory/${itemId}`).pipe(
+
+        const url = this.getFamilyApiUrl(`inventory/${itemId}`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+        
+        return this.http.delete<void>(url).pipe(
             tap(() => {
                 this.inventory.update(items => items.filter(i => i.id !== itemId));
             }),
@@ -410,7 +466,11 @@ export class DataService {
         }));
         return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
       }
-      return this.http.patch<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}`, { status }).pipe(
+      
+      const url = this.getFamilyApiUrl(`inventory/${itemId}`);
+      if (!url) return throwError(() => new Error('Active family not set'));
+
+      return this.http.patch<InventoryItem>(url, { status }).pipe(
         tap((updatedItem: InventoryItem) => {
           this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
         }),
@@ -441,8 +501,11 @@ export class DataService {
             }));
             return updatedItem ? of(updatedItem).pipe(delay(200)) : throwError(() => new Error('Item not found'));
         }
-        // This would be the implementation for a real API
-        return this.http.post<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}/comments`, { content }).pipe(
+
+        const url = this.getFamilyApiUrl(`inventory/${itemId}/comments`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+        
+        return this.http.post<InventoryItem>(url, { content }).pipe(
             tap((updatedItem: InventoryItem) => {
                 this.inventory.update(items => items.map(p => p.id === itemId ? updatedItem : p));
             }),
@@ -466,7 +529,11 @@ export class DataService {
             }));
             return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
         }
-        return this.http.delete<InventoryItem>(`${API_BASE_URL}/inventory/${itemId}/comments/${commentId}`).pipe(
+
+        const url = this.getFamilyApiUrl(`inventory/${itemId}/comments/${commentId}`);
+        if (!url) return throwError(() => new Error('Active family not set'));
+
+        return this.http.delete<InventoryItem>(url).pipe(
             tap((updatedItem: InventoryItem) => {
                 this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
             }),

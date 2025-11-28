@@ -4,9 +4,9 @@
 
 本文档提供了“家事” (Family Care) 应用后端的 API 规范。后端应提供一个 RESTful API 供 Angular 前端使用。
 
--   **基础 URL**: `/api`
--   **身份验证**: API 应为有状态的，并使用基于会话的身份验证（例如，通过安全 Cookie）。除认证端点外，所有端点都应受保护。
--   **核心概念：数据范围 (Data Scoping)**: 所有核心资源（帖子、物资清单、健康日志）都**必须**通过家庭 ID 进行访问。这确保了严格的数据隔离和安全性。后端应在处理每个请求时，验证当前登录用户是否有权访问路径中指定的 `{familyId}`。
+-   **基础 URL**: `/api/v1`
+-   **身份验证**: API 应为**无状态的**，并使用 **Token 认证**。所有受保护的端点都必须在 `Authorization` 请求头中包含一个有效的 Bearer Token (`Bearer <token>`)。
+-   **核心概念：数据范围 (Data Scoping)**: 所有核心资源（帖子、物资清单、健康日志）都**必须**通过家庭 ID 进行访问。这确保了严格的数据隔离和安全性。后端应在处理每个请求时，验证 Token 中包含的用户信息是否有权访问路径中指定的 `{familyId}`。
 -   **数据格式**: 所有请求和响应体均为 JSON 格式。
 
 ---
@@ -42,9 +42,9 @@ interface Family {
 
 ## 3. 身份验证 API
 
-处理用户注册、登录和会话管理。
+处理用户注册、登录和 Token 管理。
 
-### `POST /auth/register`
+### `POST /api/v1/auth/register`
 
 创建一个新用户账户。
 
@@ -57,12 +57,12 @@ interface Family {
     }
     ```
 -   **响应**:
-    -   `201 Created`: 注册成功并自动登录。响应体包含用户会话信息。
+    -   `201 Created`: 注册成功。响应体包含初始的 `AuthResponse` 对象。
     -   `400 Bad Request`: 输入无效（例如，用户名已存在）。
 
-### `POST /auth/login`
+### `POST /api/v1/auth/login`
 
-验证用户身份并创建会话。
+验证用户身份并返回一个 Access Token。
 
 -   **请求体**:
     ```json
@@ -71,10 +71,11 @@ interface Family {
       "password": "password123"
     }
     ```
--   **响应**:
-    -   `200 OK`: 登录成功。响应体包含用户会话信息。
+-   **响应 (`AuthResponse`)**:
+    -   `200 OK`: 登录成功。
         ```json
         {
+          "accessToken": "ey...",
           "user": { "id": 1, "name": "我", "avatar": "...", "age": 25 },
           "families": [
             { "id": "fam_demo", "name": "演示家庭", "members": [...], "inviteCode": "DEMO123" }
@@ -84,28 +85,30 @@ interface Family {
         ```
     -   `401 Unauthorized`: 凭据无效。
 
-### `POST /auth/logout`
+### `POST /api/v1/auth/logout`
 
-终止当前用户会话。
+（可选）使 Token 失效。这是一个好的实践，但对于无状态 JWT 来说不是必需的。
 
+-   **请求头**: `Authorization: Bearer <token>`
 -   **响应**:
     -   `204 No Content`: 登出成功。
 
-### `GET /auth/me`
+### `GET /api/v1/auth/me`
 
-如果会话存在，则检索当前用户的完整会话信息。
+通过验证当前 Token，检索用户的完整会话信息。
 
+-   **请求头**: `Authorization: Bearer <token>`
 -   **响应**:
-    -   `200 OK`: 会话有效。响应体结构与 `/auth/login` 成功时的响应相同。
-    -   `401 Unauthorized`: 无有效会话。
+    -   `200 OK`: Token 有效。响应体结构与 `/auth/login` 成功时的 `AuthResponse` 相同（可以不返回新的 accessToken）。
+    -   `401 Unauthorized`: Token 无效或已过期。
 
 ---
 
 ## 4. 家庭管理 API
 
-管理用户所属的家庭。
+管理用户所属的家庭。所有端点都需要 `Authorization` 头。
 
-### `POST /families`
+### `POST /api/v1/families`
 
 创建一个新家庭。创建者自动成为该家庭的第一个成员。
 
@@ -118,7 +121,7 @@ interface Family {
 -   **响应**:
     -   `201 Created`: 返回新创建的完整 `Family` 对象。
 
-### `POST /families/join`
+### `POST /api/v1/families/join`
 
 使用邀请码加入一个现有的家庭。
 
@@ -133,14 +136,14 @@ interface Family {
     -   `400 Bad Request`: 邀请码无效或用户已是该家庭成员。
     -   `404 Not Found`: 找不到使用该邀请码的家庭。
 
-### `POST /families/{familyId}/switch`
+### `POST /api/v1/families/{familyId}/switch`
 
-在用户的会话中切换当前激活的家庭。
+在用户的会话中切换当前激活的家庭。后端应返回一个新的 Token 或更新后的 `AuthResponse`，其中包含新的 `activeFamilyId`。
 
 -   **路径参数**:
     -   `familyId` (string): 要激活的家庭 ID。
 -   **响应**:
-    -   `204 No Content`: 切换成功。
+    -   `200 OK`: 返回更新后的 `AuthResponse` 对象。
     -   `403 Forbidden`: 用户不是该家庭的成员。
     -   `404 Not Found`: 家庭不存在。
 
@@ -148,9 +151,9 @@ interface Family {
 
 ## 5. 帖子 API
 
-所有帖子都与一个特定的家庭相关联。
+所有帖子都与一个特定的家庭相关联。所有端点都需要 `Authorization` 头。
 
-### `GET /families/{familyId}/posts`
+### `GET /api/v1/families/{familyId}/posts`
 
 获取指定家庭的所有帖子列表，按时间倒序。
 
@@ -160,7 +163,7 @@ interface Family {
     -   `200 OK`: 返回一个 `Post` 对象数组。
     -   `403 Forbidden`: 用户无权访问该家庭。
 
-### `POST /families/{familyId}/posts`
+### `POST /api/v1/families/{familyId}/posts`
 
 在指定家庭中创建一个新帖子。
 
@@ -169,7 +172,7 @@ interface Family {
 -   **响应**:
     -   `201 Created`: 返回完整、新创建的 `Post` 对象。
 
-### `POST /families/{familyId}/posts/{postId}/reactions`
+### `POST /api/v1/families/{familyId}/posts/{postId}/reactions`
 
 为帖子添加一个回应。
 
@@ -177,7 +180,7 @@ interface Family {
 -   **请求体**: `{ "type": "ILL_DO_IT" }`
 -   **响应**: `200 OK`，返回更新后的 `Post` 对象。
 
-### `POST /families/{familyId}/posts/{postId}/comments`
+### `POST /api/v1/families/{familyId}/posts/{postId}/comments`
 
 向帖子添加一条评论。
 
@@ -185,14 +188,14 @@ interface Family {
 -   **请求体**: `{ "content": "..." }`
 -   **响应**: `200 OK`，返回更新后的 `Post` 对象。
 
-### `DELETE /families/{familyId}/posts/{postId}/comments/{commentId}`
+### `DELETE /api/v1/families/{familyId}/posts/{postId}/comments/{commentId}`
 
 删除一条评论。需要验证用户是否为评论作者。
 
 -   **路径参数**: `familyId`, `postId`, `commentId`
 -   **响应**: `200 OK` (返回更新后的 `Post` 对象) 或 `204 No Content`。
 
-### `PATCH /families/{familyId}/posts/{postId}`
+### `PATCH /api/v1/families/{familyId}/posts/{postId}`
 
 更新一个帖子（例如，更新状态）。
 
@@ -204,16 +207,16 @@ interface Family {
 
 ## 6. 物资清单 API
 
-所有物资都与一个特定的家庭相关联。
+所有物资都与一个特定的家庭相关联。所有端点都需要 `Authorization` 头。
 
-### `GET /families/{familyId}/inventory`
+### `GET /api/v1/families/{familyId}/inventory`
 
 获取指定家庭的所有物资项目。
 
 -   **路径参数**: `familyId` (string)
 -   **响应**: `200 OK`，返回 `InventoryItem` 对象数组。
 
-### `POST /families/{familyId}/inventory`
+### `POST /api/v1/families/{familyId}/inventory`
 
 向指定家庭的物资清单中添加一个新项目。
 
@@ -221,7 +224,7 @@ interface Family {
 -   **请求体**: `Omit<InventoryItem, 'id' | 'status' | 'comments'>`
 -   **响应**: `201 Created`，返回新创建的 `InventoryItem` 对象。
 
-### `PATCH /families/{familyId}/inventory/{itemId}`
+### `PATCH /api/v1/families/{familyId}/inventory/{itemId}`
 
 更新一个物资项目的信息。
 
@@ -229,14 +232,14 @@ interface Family {
 -   **请求体**: `Partial<Omit<InventoryItem, 'id' | 'comments'>>`
 -   **响应**: `200 OK`，返回更新后的 `InventoryItem` 对象。
 
-### `DELETE /families/{familyId}/inventory/{itemId}`
+### `DELETE /api/v1/families/{familyId}/inventory/{itemId}`
 
 删除一个物资项目。
 
 -   **路径参数**: `familyId`, `itemId`
 -   **响应**: `204 No Content`。
 
-### `POST /families/{familyId}/inventory/{itemId}/comments`
+### `POST /api/v1/families/{familyId}/inventory/{itemId}/comments`
 
 向物资项目添加一条评论。
 
@@ -244,7 +247,7 @@ interface Family {
 -   **请求体**: `{ "content": "..." }`
 -   **响应**: `200 OK`，返回更新后的 `InventoryItem` 对象。
 
-### `DELETE /families/{familyId}/inventory/{itemId}/comments/{commentId}`
+### `DELETE /api/v1/families/{familyId}/inventory/{itemId}/comments/{commentId}`
 
 删除一条物资项目的评论。
 
@@ -255,16 +258,16 @@ interface Family {
 
 ## 7. 健康日志 API
 
-健康日志与用户个人绑定，但在家庭上下文中查看。
+健康日志与用户个人绑定，但在家庭上下文中查看。所有端点都需要 `Authorization` 头。
 
-### `GET /families/{familyId}/health-logs`
+### `GET /api/v1/families/{familyId}/health-logs`
 
 获取当前登录用户在指定家庭上下文中的所有健康日志。
 
 -   **路径参数**: `familyId` (string)
 -   **响应**: `200 OK`，返回 `HealthLog` 对象数组。
 
-### `POST /families/{familyId}/health-logs`
+### `POST /api/v1/families/{familyId}/health-logs`
 
 为当前用户在指定家庭上下文中创建一个新的健康日志。
 

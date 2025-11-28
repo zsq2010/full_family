@@ -150,3 +150,10 @@ export interface Family {
   members: Assignee[];
   inviteCode: string;
 }
+
+export interface AuthResponse {
+  accessToken: string;
+  user: Assignee;
+  families: Family[];
+  activeFamilyId: string | null;
+}
