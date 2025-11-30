@@ -91,9 +91,8 @@ export class DataService {
         );
     }
 
-    addReaction(postId: number, type: ReactionType, currentUser: Assignee): Observable<Post> {
+    addReaction(postId: number, type: ReactionType, currentUser: Assignee): Observable<void> {
       if (USE_MOCK_API) {
-        let updatedPost: Post | undefined;
         this.posts.update(posts => posts.map(p => {
             if (p.id === postId) {
                 const newReactions = p.reactions.filter(r => r.author.name !== currentUser.name || r.type !== type);
@@ -101,31 +100,40 @@ export class DataService {
                 if (!hasReacted) {
                     newReactions.push({ author: currentUser, type });
                 }
-                updatedPost = { ...p, reactions: newReactions };
-                return updatedPost;
+                return { ...p, reactions: newReactions };
             }
             return p;
         }));
-        return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
+        return of(undefined);
       }
       
       const url = this.getFamilyApiUrl(`posts/${postId}/reactions`);
       if (!url) return throwError(() => new Error('Active family not set'));
       
-      return this.http.post<Post>(url, { type }).pipe(
-        tap((updatedPost: Post) => {
-            this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
+      return this.http.post<void>(url, { type }).pipe(
+        tap(() => { // Optimistic update
+            this.posts.update(posts => posts.map(p => {
+                if (p.id === postId) {
+                    const newReactions = p.reactions.filter(r => r.author.name !== currentUser.name || r.type !== type);
+                    const hasReacted = p.reactions.length !== newReactions.length;
+                     if (!hasReacted) {
+                        newReactions.push({ author: currentUser, type });
+                    }
+                    return { ...p, reactions: newReactions };
+                }
+                return p;
+            }));
         }),
         catchError(err => {
             console.error('Failed to add reaction', err);
+            // Optionally: add logic to revert optimistic update
             return throwError(() => err);
         })
       );
     }
 
-    addComment(postId: number, content: string, currentUser: Assignee): Observable<Post> {
+    addComment(postId: number, content: string, currentUser: Assignee): Observable<void> {
         if (USE_MOCK_API) {
-            let updatedPost: Post | undefined;
             const newComment: Comment = {
                 id: Date.now(),
                 author: currentUser.name,
@@ -135,21 +143,26 @@ export class DataService {
             };
             this.posts.update(posts => posts.map(p => {
                 if (p.id === postId) {
-                    updatedPost = { ...p, comments: [...p.comments, newComment] };
-                    return updatedPost;
+                    return { ...p, comments: [...p.comments, newComment] };
                 }
                 return p;
             }));
-            return updatedPost ? of(updatedPost).pipe(delay(200)) : throwError(() => new Error('Post not found'));
+            return of(undefined).pipe(delay(200));
         }
         
         const url = this.getFamilyApiUrl(`posts/${postId}/comments`);
         if (!url) return throwError(() => new Error('Active family not set'));
 
-        return this.http.post<Post>(url, { content }).pipe(
-            tap((updatedPost: Post) => {
-                this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
+        return this.http.post<Comment>(url, { content }).pipe(
+            tap((newComment: Comment) => {
+                this.posts.update(posts => posts.map(p => {
+                    if (p.id === postId) {
+                        return { ...p, comments: [...p.comments, newComment] };
+                    }
+                    return p;
+                }));
             }),
+            map(() => undefined), // Transform to Observable<void> for the component
             catchError(err => {
                 console.error('Failed to add comment', err);
                 return throwError(() => err);
@@ -157,25 +170,28 @@ export class DataService {
         );
     }
 
-    deleteComment(postId: number, commentId: number): Observable<Post> {
+    deleteComment(postId: number, commentId: number): Observable<void> {
         if (USE_MOCK_API) {
-            let updatedPost: Post | undefined;
             this.posts.update(posts => posts.map(p => {
                 if (p.id === postId) {
-                    updatedPost = { ...p, comments: p.comments.filter(c => c.id !== commentId) };
-                    return updatedPost;
+                    return { ...p, comments: p.comments.filter(c => c.id !== commentId) };
                 }
                 return p;
             }));
-            return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
+            return of(undefined);
         }
         
         const url = this.getFamilyApiUrl(`posts/${postId}/comments/${commentId}`);
         if (!url) return throwError(() => new Error('Active family not set'));
 
-        return this.http.delete<Post>(url).pipe(
-            tap((updatedPost: Post) => {
-                this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
+        return this.http.delete<void>(url).pipe(
+            tap(() => {
+                this.posts.update(posts => posts.map(p => {
+                    if (p.id === postId) {
+                        return { ...p, comments: p.comments.filter(c => c.id !== commentId) };
+                    }
+                    return p;
+                }));
             }),
             catchError(err => {
                 console.error('Failed to delete comment', err);
@@ -184,28 +200,32 @@ export class DataService {
         );
     }
 
-    markTaskAsDone(postId: number): Observable<Post> {
+    markTaskAsDone(postId: number): Observable<void> {
       if (USE_MOCK_API) {
-        let updatedPost: Post | undefined;
         this.posts.update(posts => posts.map(p => {
             if (p.id === postId) {
-                updatedPost = { ...p, status: 'DONE' };
-                return updatedPost;
+                return { ...p, status: 'DONE' };
             }
             return p;
         }));
-        return updatedPost ? of(updatedPost) : throwError(() => new Error('Post not found'));
+        return of(undefined);
       }
       
       const url = this.getFamilyApiUrl(`posts/${postId}`);
       if (!url) return throwError(() => new Error('Active family not set'));
       
-      return this.http.patch<Post>(url, { status: 'DONE' }).pipe(
-        tap((updatedPost: Post) => {
-            this.posts.update(posts => posts.map(p => p.id === postId ? updatedPost : p));
+      return this.http.patch<void>(url, { status: 'DONE' }).pipe(
+        tap(() => { // Optimistic update
+            this.posts.update(posts => posts.map(p => {
+                if (p.id === postId) {
+                    return { ...p, status: 'DONE' };
+                }
+                return p;
+            }));
         }),
         catchError(err => {
             console.error('Failed to mark task as done', err);
+            // Optionally: add logic to revert optimistic update
             return throwError(() => err);
         })
       );
@@ -243,7 +263,7 @@ export class DataService {
 
     private getCurrentWeather(latitude: number, longitude: number): Observable<WeatherInfo> {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
-      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
+      // FIX: Provide a generic type for the http.get call to correctly type the API response and prevent 'Property does not exist on type unknown' errors.
       return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
         map((response) => ({
           temperature: response.current.temperature_2m,
@@ -255,7 +275,7 @@ export class DataService {
     
     private getCurrentAirQuality(latitude: number, longitude: number): Observable<AirQualityInfo> {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
-      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
+      // FIX: Provide a generic type for the http.get call to correctly type the API response and prevent 'Property does not exist on type unknown' errors.
       return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
         map((response) => ({
           aqi: response.current.us_aqi,
@@ -271,7 +291,7 @@ export class DataService {
 
     private getLocationName(latitude: number, longitude: number): Observable<string | null> {
       const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
-      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
+      // FIX: Provide a generic type for the http.get call to correctly type the API response and prevent 'Property does not exist on type unknown' errors.
       return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
           map((response) => {
               if (response.results && response.results.length > 0) {
@@ -398,8 +418,13 @@ export class DataService {
 
       const url = this.getFamilyApiUrl('inventory');
       if (!url) return throwError(() => new Error('Active family not set'));
+      
+      const payload = {
+        ...itemData,
+        status: 'IN_STOCK'
+      };
 
-      return this.http.post<InventoryItem>(url, itemData).pipe(
+      return this.http.post<InventoryItem>(url, payload).pipe(
         tap((createdItem: InventoryItem) => {
           this.inventory.update(currentItems => [createdItem, ...currentItems]);
         }),
@@ -457,25 +482,28 @@ export class DataService {
         );
     }
 
-    updateInventoryItemStatus(itemId: number, status: InventoryStatus): Observable<InventoryItem> {
+    updateInventoryItemStatus(itemId: number, status: InventoryStatus): Observable<void> {
       if (USE_MOCK_API) {
-        let updatedItem: InventoryItem | undefined;
         this.inventory.update(items => items.map(i => {
             if (i.id === itemId) {
-                updatedItem = { ...i, status };
-                return updatedItem;
+                return { ...i, status };
             }
             return i;
         }));
-        return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
+        return of(undefined);
       }
       
       const url = this.getFamilyApiUrl(`inventory/${itemId}`);
       if (!url) return throwError(() => new Error('Active family not set'));
 
-      return this.http.patch<InventoryItem>(url, { status }).pipe(
-        tap((updatedItem: InventoryItem) => {
-          this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
+      return this.http.patch<void>(url, { status }).pipe(
+        tap(() => { // Optimistic update
+          this.inventory.update(items => items.map(i => {
+            if (i.id === itemId) {
+                return { ...i, status };
+            }
+            return i;
+          }));
         }),
         catchError(err => {
             console.error('Failed to update inventory item status', err);
@@ -484,9 +512,8 @@ export class DataService {
       );
     }
 
-    addInventoryComment(itemId: number, content: string, currentUser: Assignee): Observable<InventoryItem> {
+    addInventoryComment(itemId: number, content: string, currentUser: Assignee): Observable<void> {
         if (USE_MOCK_API) {
-            let updatedItem: InventoryItem | undefined;
             const newComment: InventoryItemComment = {
                 id: Date.now(),
                 author: currentUser.name,
@@ -497,21 +524,27 @@ export class DataService {
             this.inventory.update(items => items.map(i => {
                 if (i.id === itemId) {
                     const existingComments = i.comments ?? [];
-                    updatedItem = { ...i, comments: [...existingComments, newComment] };
-                    return updatedItem;
+                    return { ...i, comments: [...existingComments, newComment] };
                 }
                 return i;
             }));
-            return updatedItem ? of(updatedItem).pipe(delay(200)) : throwError(() => new Error('Item not found'));
+            return of(undefined).pipe(delay(200));
         }
 
         const url = this.getFamilyApiUrl(`inventory/${itemId}/comments`);
         if (!url) return throwError(() => new Error('Active family not set'));
         
-        return this.http.post<InventoryItem>(url, { content }).pipe(
-            tap((updatedItem: InventoryItem) => {
-                this.inventory.update(items => items.map(p => p.id === itemId ? updatedItem : p));
+        return this.http.post<InventoryItemComment>(url, { content }).pipe(
+            tap((newComment: InventoryItemComment) => {
+                this.inventory.update(items => items.map(i => {
+                    if (i.id === itemId) {
+                        const existingComments = i.comments ?? [];
+                        return { ...i, comments: [...existingComments, newComment] };
+                    }
+                    return i;
+                }));
             }),
+            map(() => undefined), // Transform to Observable<void> for the component
             catchError(err => {
                 console.error('Failed to add inventory comment', err);
                 return throwError(() => err);
@@ -519,26 +552,30 @@ export class DataService {
         );
     }
 
-    deleteInventoryComment(itemId: number, commentId: number): Observable<InventoryItem> {
+    deleteInventoryComment(itemId: number, commentId: number): Observable<void> {
         if (USE_MOCK_API) {
-            let updatedItem: InventoryItem | undefined;
             this.inventory.update(items => items.map(i => {
                 if (i.id === itemId) {
                     const existingComments = i.comments ?? [];
-                    updatedItem = { ...i, comments: existingComments.filter(c => c.id !== commentId) };
-                    return updatedItem;
+                    return { ...i, comments: existingComments.filter(c => c.id !== commentId) };
                 }
                 return i;
             }));
-            return updatedItem ? of(updatedItem) : throwError(() => new Error('Item not found'));
+            return of(undefined);
         }
 
         const url = this.getFamilyApiUrl(`inventory/${itemId}/comments/${commentId}`);
         if (!url) return throwError(() => new Error('Active family not set'));
 
-        return this.http.delete<InventoryItem>(url).pipe(
-            tap((updatedItem: InventoryItem) => {
-                this.inventory.update(items => items.map(i => i.id === itemId ? updatedItem : i));
+        return this.http.delete<void>(url).pipe(
+            tap(() => {
+                this.inventory.update(items => items.map(i => {
+                    if (i.id === itemId) {
+                        const existingComments = i.comments ?? [];
+                        return { ...i, comments: existingComments.filter(c => c.id !== commentId) };
+                    }
+                    return i;
+                }));
             }),
             catchError(err => {
                 console.error('Failed to delete inventory comment', err);

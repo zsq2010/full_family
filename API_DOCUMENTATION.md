@@ -115,7 +115,7 @@ interface Family {
 -   **请求体**:
     ```json
     {
-      "familyName": "快乐一家"
+      "name": "快乐一家"
     }
     ```
 -   **响应**:
@@ -178,7 +178,7 @@ interface Family {
 
 -   **路径参数**: `familyId`, `postId`
 -   **请求体**: `{ "type": "ILL_DO_IT" }`
--   **响应**: `200 OK`，返回更新后的 `Post` 对象。
+-   **响应**: `204 No Content`。
 
 ### `POST /api/v1/families/{familyId}/posts/{postId}/comments`
 
@@ -186,14 +186,14 @@ interface Family {
 
 -   **路径参数**: `familyId`, `postId`
 -   **请求体**: `{ "content": "..." }`
--   **响应**: `200 OK`，返回更新后的 `Post` 对象。
+-   **响应**: `201 Created`，返回新创建的 `Comment` 对象。
 
 ### `DELETE /api/v1/families/{familyId}/posts/{postId}/comments/{commentId}`
 
 删除一条评论。需要验证用户是否为评论作者。
 
 -   **路径参数**: `familyId`, `postId`, `commentId`
--   **响应**: `200 OK` (返回更新后的 `Post` 对象) 或 `204 No Content`。
+-   **响应**: `204 No Content`。
 
 ### `PATCH /api/v1/families/{familyId}/posts/{postId}`
 
@@ -201,7 +201,9 @@ interface Family {
 
 -   **路径参数**: `familyId`, `postId`
 -   **请求体**: `{"status": "DONE"}`
--   **响应**: `200 OK`，返回更新后的 `Post` 对象。
+-   **响应**:
+    -   对于简单的状态更新: `204 No Content`。
+    -   对于更复杂的更新: `200 OK`，返回更新后的 `Post` 对象。
 
 ---
 
@@ -230,7 +232,9 @@ interface Family {
 
 -   **路径参数**: `familyId`, `itemId`
 -   **请求体**: `Partial<Omit<InventoryItem, 'id' | 'comments'>>`
--   **响应**: `200 OK`，返回更新后的 `InventoryItem` 对象。
+-   **响应**:
+    -   对于简单的状态更新: `204 No Content`。
+    -   对于其他字段更新: `200 OK`，返回更新后的 `InventoryItem` 对象。
 
 ### `DELETE /api/v1/families/{familyId}/inventory/{itemId}`
 
@@ -245,14 +249,14 @@ interface Family {
 
 -   **路径参数**: `familyId`, `itemId`
 -   **请求体**: `{ "content": "..." }`
--   **响应**: `200 OK`，返回更新后的 `InventoryItem` 对象。
+-   **响应**: `201 Created`，返回新创建的 `InventoryItemComment` 对象。
 
 ### `DELETE /api/v1/families/{familyId}/inventory/{itemId}/comments/{commentId}`
 
 删除一条物资项目的评论。
 
 -   **路径参数**: `familyId`, `itemId`, `commentId`
--   **响应**: `200 OK` (返回更新后的 `InventoryItem` 对象) 或 `204 No Content`。
+-   **响应**: `204 No Content`。
 
 ---
 
