@@ -1,0 +1,208 @@
+<div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2">
+    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+        <h1 class="text-2xl font-bold text-slate-800">物资清单</h1>
+        <button (click)="openNewItemPanel()" class="flex items-center justify-center w-8 h-8 rounded-full bg-sky-500 text-white hover:bg-sky-600 transition-colors shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+        </button>
+    </div>
+    <div class="mt-2 bg-slate-200/80 p-1 rounded-lg flex gap-1 text-xs font-bold w-full">
+        <button (click)="activeInventoryTab.set('stock')" [class]="activeInventoryTab() === 'stock' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all flex-1 text-center">
+            库存清单
+        </button>
+        <button (click)="activeInventoryTab.set('shopping')" [class]="activeInventoryTab() === 'shopping' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all flex-1 text-center relative">
+            购物清单
+            @if (shoppingListItems().length > 0) {
+            <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                {{ shoppingListItems().length }}
+            </span>
+            }
+        </button>
+    </div>
+</div>
+
+<main class="mt-6 space-y-6">
+    @if (activeInventoryTab() === 'stock') {
+    @if (inventoryCategories().length > 0) {
+    @for(category of inventoryCategories(); track category; let isFirstCategory = $first) {
+    @let items = groupedInventory()[category];
+    <div>
+        <h2 class="text-lg font-bold text-slate-700 mb-2">{{ category }}</h2>
+        <div class="space-y-3">
+            @for(item of items; track item.id; let isFirstItem = $first) {
+            <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100 flex flex-wrap items-start gap-4 relative">
+                <img [priority]="isFirstCategory && isFirstItem" [ngSrc]="item.image" alt="{{item.name}}" width="64" height="64" class="w-16 h-16 rounded-md object-cover flex-shrink-0">
+                <div class="flex-1 min-w-[150px]">
+                    <h3 class="font-bold text-base text-slate-800">{{ item.name }}</h3>
+                    <div class="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                        @if(item.brand) { <span>{{ item.brand }}</span> }
+                        @if(item.brand && item.store) { <span>&middot;</span> }
+                        @if(item.store) { <span>@ {{ item.store }}</span> }
+                    </div>
+                    @if(item.usageScenario) {
+                    <p class="text-xs text-slate-600 mt-1 italic">场景: {{ item.usageScenario }}</p>
+                    }
+                    @if(item.notes) { <p class="text-xs text-slate-600 mt-1">"{{ item.notes }}"</p> }
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <button (click)="updateItemStatus(item.id, 'IN_STOCK')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors" [class]="item.status === 'IN_STOCK' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                            有货
+                        </button>
+                        <button (click)="updateItemStatus(item.id, 'RUNNING_LOW')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors" [class]="item.status === 'RUNNING_LOW' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                            快用完了
+                        </button>
+                        <button (click)="updateItemStatus(item.id, 'OUT_OF_STOCK')" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors" [class]="item.status === 'OUT_OF_STOCK' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'">
+                            已用完
+                        </button>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-100">
+                        <div class="flex justify-end items-center gap-1">
+                            <button (click)="toggleInventoryCommentInput(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200">
+                                补充信息 ({{ item.comments?.length ?? 0 }})
+                            </button>
+                            <button (click)="openEditItemPanel(item)" class="p-2 rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors" aria-label="编辑物品">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                    <path d="M11.354 1.646a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.354.146H2.5a.5.5 0 0 1-.5-.5v-1.208a.5.5 0 0 1 .146-.354l10-10ZM12 3.5 3.5 12H3v-.5L11.5 3l.5.5Z" />
+                                </svg>
+                            </button>
+                            <button (click)="deleteItem(item.id, item.name)" class="p-2 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors" aria-label="删除物品">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                    <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <span [class]="'absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded-full ' + getInventoryStatusConfig(item.status).buttonClasses">
+                    {{ getInventoryStatusConfig(item.status).text }}
+                </span>
+                <!-- Comments section -->
+                @if((item.comments && item.comments.length > 0) || commentingOnItemId() === item.id) {
+                <div class="mt-2 pt-3 border-t border-slate-100 w-full space-y-2">
+                    @for (comment of item.comments; track comment.id) {
+                    <div class="flex items-start gap-2 animate-fade-in group">
+                        <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                        <div class="flex-1 text-sm bg-slate-100 px-3 py-2 rounded-lg rounded-tl-none">
+                            <p class="font-semibold text-slate-800">{{ comment.author }}</p>
+                            <p class="text-slate-600">{{ comment.content }}</p>
+                        </div>
+                        @if(comment.author === loggedInUser()!.name) {
+                        <button (click)="deleteInventoryItemComment(item.id, comment.id)" class="p-1 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="删除评论">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                                <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        }
+                    </div>
+                    }
+                    @if (commentingOnItemId() === item.id) {
+                    <div class="flex items-start gap-2 animate-fade-in">
+                        <img [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                        <div class="flex-1 space-y-2">
+                            <textarea [value]="newInventoryCommentContent()" (input)="onInventoryCommentInput($event)" rows="2" placeholder="补充使用经验..." class="w-full text-sm bg-white p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                            <div class="flex items-center gap-2">
+                                <button (click)="submitInventoryComment(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">发送</button>
+                                <button (click)="toggleInventoryCommentInput(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300">取消</button>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+                }
+            </div>
+            }
+        </div>
+    </div>
+    }
+    } @else {
+    <div class="text-center py-16 text-slate-500">
+        <p>库存里还没有物品。</p>
+        <p>点击右上角的 "+" 按钮添加一个吧。</p>
+    </div>
+    }
+    } @else if (activeInventoryTab() === 'shopping') {
+    @if (shoppingListItems().length > 0) {
+    <div class="space-y-3">
+        @for(item of shoppingListItems(); track item.id; let isFirst = $first) {
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100 flex items-center gap-4">
+            <img [priority]="isFirst" [ngSrc]="item.image" alt="{{item.name}}" width="64" height="64" class="w-16 h-16 rounded-md object-cover">
+            <div class="flex-1">
+                <h3 class="font-bold text-slate-800">{{ item.name }}</h3>
+                <div class="text-xs text-slate-500 flex items-center gap-2">
+                    @if(item.brand) { <span>{{ item.brand }}</span> }
+                    @if(item.brand && item.store) { <span>&middot;</span> }
+                    @if(item.store) { <span>@ {{ item.store }}</span> }
+                </div>
+                @if(item.notes) { <p class="text-xs text-slate-600 mt-1 italic">"{{ item.notes }}"</p> }
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <span [class]="'text-xs font-semibold px-2 py-1 rounded-full ' + getInventoryStatusConfig(item.status).buttonClasses">
+                    {{ getInventoryStatusConfig(item.status).text }}
+                </span>
+                <button (click)="markAsPurchased(item.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+                    已购
+                </button>
+            </div>
+        </div>
+        }
+    </div>
+    } @else {
+    <div class="text-center py-16 text-slate-500">
+        <p>太棒了！</p>
+        <p>购物清单是空的。</p>
+    </div>
+    }
+    }
+</main>
+
+<!-- New/Edit Inventory Item Panel -->
+@if(isNewItemPanelOpen()) {
+<div class="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-20" (click)="closeNewItemPanel()"></div>
+<div class="fixed bottom-0 left-0 right-0 z-30 max-w-2xl mx-auto">
+    <form [formGroup]="newItemForm" (ngSubmit)="onAddNewItemSubmit()" class="bg-white p-4 shadow-2xl rounded-t-2xl animate-slide-in-up">
+        <h2 class="font-bold text-slate-800">{{ editingItemId() ? '编辑物资' : '添加新物资' }}</h2>
+        <div class="mt-4 grid grid-cols-1 gap-4 text-sm max-h-[60vh] overflow-y-auto pr-2">
+            <div>
+                <label class="font-medium">名称*</label>
+                <input formControlName="name" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" required>
+            </div>
+            <div>
+                <label class="font-medium">分类*</label>
+                <select formControlName="category" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="食材">食材</option>
+                    <option value="清洁用品">清洁用品</option>
+                    <option value="生活用品">生活用品</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-medium">图片链接</label>
+                <input formControlName="image" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="font-medium">品牌</label>
+                    <input formControlName="brand" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                <div>
+                    <label class="font-medium">商店</label>
+                    <input formControlName="store" type="text" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+            </div>
+            <div>
+                <label class="font-medium">使用场景</label>
+                <textarea formControlName="usageScenario" rows="2" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="例如：适合直接饮用、制作拿铁或燕麦粥"></textarea>
+            </div>
+            <div>
+                <label class="font-medium">使用经验/备注</label>
+                <textarea formControlName="notes" rows="2" class="mt-1 w-full p-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="例如：这个牌子味道更好、买大包装的"></textarea>
+            </div>
+        </div>
+        <div class="mt-4 pt-4 border-t flex justify-end gap-2">
+            <button type="button" (click)="closeNewItemPanel()" class="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors">取消</button>
+            <button type="submit" [disabled]="newItemForm.invalid" class="px-4 py-2 text-sm font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-md transition-colors disabled:bg-slate-300">
+                {{ editingItemId() ? '保存更改' : '添加' }}
+            </button>
+        </div>
+    </form>
+</div>
+}

@@ -1,0 +1,344 @@
+<!-- Sticky Header Wrapper -->
+<div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm">
+    <!-- Sticky Home Screen Tabs & Family Switcher -->
+    <nav #mainNav class="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 border-b border-slate-200">
+        <div class="flex items-center justify-between gap-4">
+            <!-- Family Switcher on the left -->
+            <div class="relative">
+              @if(activeFamily()) {
+              <button (click)="isFamilySwitcherOpen.set(!isFamilySwitcherOpen())" class="flex items-center gap-2 text-left p-2 -ml-2 rounded-lg hover:bg-slate-200 transition-colors">
+                  <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 flex-shrink-0">
+                      {{ activeFamily()?.name.charAt(0) }}
+                  </div>
+                  <div>
+                      <p class="font-bold text-sm text-slate-800 leading-tight">{{ activeFamily()?.name }}</p>
+                      <p class="text-xs text-slate-500 leading-tight">点击切换</p>
+                  </div>
+              </button>
+              }
+              <!-- Family Switcher Dropdown Panel -->
+              @if (isFamilySwitcherOpen()) {
+                <div>
+                  <!-- Overlay -->
+                  <div (click)="isFamilySwitcherOpen.set(false); closeFamilySwitcher()" class="fixed inset-0 z-30"></div>
+                  <!-- Panel -->
+                  <div class="absolute top-full left-0 mt-2 z-40 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 animate-fade-in-down overflow-hidden">
+                    <div class="p-4 border-b border-slate-200">
+                        <h2 class="text-base font-bold text-slate-800">切换或管理家庭</h2>
+                        <p class="text-xs text-slate-500 mt-1">选择一个家庭或创建/加入新的家庭。</p>
+                    </div>
+            
+                    <div class="p-4 max-h-80 overflow-y-auto">
+                        <!-- Family List -->
+                        <div class="space-y-2">
+                            @for(family of userFamilies(); track family.id) {
+                            <button (click)="onSwitchFamily(family.id)" 
+                                    [disabled]="family.id === activeFamily()?.id"
+                                    class="w-full text-left p-2 rounded-lg flex items-center gap-3 transition-colors disabled:opacity-100"
+                                    [class]="family.id === activeFamily()?.id ? 'bg-sky-100 text-sky-800' : 'hover:bg-slate-100'">
+                                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 flex-shrink-0">
+                                {{ family.name.charAt(0) }}
+                                </div>
+                                <div>
+                                <p class="font-semibold text-sm">{{ family.name }}</p>
+                                <p class="text-xs text-slate-500">{{ family.members.length }} 位成员</p>
+                                </div>
+                                @if(family.id === activeFamily()?.id) {
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 ml-auto text-sky-600 flex-shrink-0">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+                                </svg>
+                                }
+                            </button>
+                            }
+                        </div>
+                
+                        <!-- Separator -->
+                        <div class="my-4 border-t border-slate-200"></div>
+                
+                        <!-- Actions: Create / Join -->
+                        @if(!showCreateFamilyForm() && !showJoinFamilyForm()) {
+                            <div class="grid grid-cols-2 gap-2">
+                                <button (click)="showCreateFamilyForm.set(true)" class="w-full text-xs font-semibold px-3 py-2 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">
+                                    创建新家庭
+                                </button>
+                                <button (click)="showJoinFamilyForm.set(true)" class="w-full text-xs font-semibold px-3 py-2 rounded-md transition-colors bg-emerald-500 text-white hover:bg-emerald-600">
+                                    加入家庭
+                                </button>
+                            </div>
+                        }
+                
+                        <!-- Forms shown conditionally -->
+                        @if(showCreateFamilyForm()) {
+                            <form [formGroup]="createFamilyForm" (ngSubmit)="onCreateFamilySubmit()" class="animate-fade-in-down space-y-3">
+                                <h3 class="font-semibold text-sm">为您的家庭取个名字</h3>
+                                <input type="text" formControlName="familyName" placeholder="例如：快乐一家" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-sm">
+                                <div class="flex gap-2">
+                                    <button type="button" (click)="showCreateFamilyForm.set(false); familyError.set(null);" class="w-full flex justify-center py-2 px-4 rounded-md text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300">取消</button>
+                                    <button type="submit" [disabled]="createFamilyForm.invalid || isCreatingFamily()" class="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-md text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400">
+                                        @if(isCreatingFamily()){ <span>创建中...</span> } @else { <span>创建</span> }
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                
+                        @if(showJoinFamilyForm()) {
+                            <form [formGroup]="joinFamilyForm" (ngSubmit)="onJoinFamilySubmit()" class="animate-fade-in-down space-y-3">
+                                <h3 class="font-semibold text-sm">输入家庭邀请码</h3>
+                                <input type="text" formControlName="inviteCode" placeholder="粘贴邀请码" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-sm">
+                                <div class="flex gap-2">
+                                    <button type="button" (click)="showJoinFamilyForm.set(false); familyError.set(null);" class="w-full flex justify-center py-2 px-4 rounded-md text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300">取消</button>
+                                    <button type="submit" [disabled]="joinFamilyForm.invalid || isJoiningFamily()" class="w-full flex justify-center items-center gap-2 py-2 px-4 rounded-md text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400">
+                                        @if(isJoiningFamily()){ <span>加入中...</span> } @else { <span>加入</span> }
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                        @if(familyError()) {
+                            <p class="mt-3 text-sm text-red-600 text-center">{{ familyError() }}</p>
+                        }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+            <!-- Filter tabs on the right -->
+            <div class="bg-slate-200/80 p-1 rounded-lg flex flex-wrap gap-1 text-xs font-bold">
+                <button (click)="setActiveHomeTab('all')" [class]="activeHomeTab() === 'all' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                  全部
+                </button>
+                <button (click)="setActiveHomeTab('daily')" [class]="activeHomeTab() === 'daily' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                  家庭日常
+                </button>
+                <button (click)="setActiveHomeTab('health')" [class]="activeHomeTab() === 'health' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                  家庭健康
+                </button>
+                <button (click)="setActiveHomeTab('knowledge')" [class]="activeHomeTab() === 'knowledge' ? 'bg-white shadow-sm text-slate-700' : 'text-slate-500 hover:text-slate-700'" class="py-1.5 px-2 rounded-md transition-all">
+                  知识分享
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sticky Health Notice -->
+    @if (urgentHealthPosts().length > 0) {
+    <div #stickyNotice class="shadow-md animate-fade-in-down -mx-4 sm:-mx-6 lg:-mx-8 border-b border-slate-200">
+        @for(post of urgentHealthPosts(); track post.id) {
+        @let typeConfig = getPostTypeConfig(post);
+        <div (click)="scrollToPost(post.id)" [class]="'px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm border-b cursor-pointer hover:bg-red-100/50 transition-colors ' + typeConfig.colorClasses" [class.border-red-300]="true">
+            <span [class]="typeConfig.iconClasses + ' text-lg'">{{ typeConfig.icon }}</span>
+            @if (post.subject) {
+            <img [ngSrc]="post.subject.avatar" [alt]="post.subject.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+            }
+            <p class="font-semibold truncate flex-1">
+                {{ typeConfig.title }}:
+                <span class="font-normal">{{ post.content }}</span>
+            </p>
+            <span class="text-xs font-medium text-red-700/80">{{post.timestamp}}</span>
+        </div>
+        }
+    </div>
+    }
+</div>
+
+<main class="mt-6 space-y-6">
+    @if (homePosts().length > 0) {
+    @for (post of homePosts(); track post.id) {
+    @let typeConfig = getPostTypeConfig(post);
+    @let isMyPost = post.author === loggedInUser()!.name;
+    @let isUrgent = urgentHealthPostIds().has(post.id);
+
+    <div class="flex flex-col transition-opacity" [id]="'post-' + post.id" [class.opacity-50]="post.status === 'DONE'">
+        <!-- Message Row -->
+        <div class="flex items-start gap-3" [class.justify-end]="isMyPost">
+
+            <!-- Avatar (DOM order: 1st) -->
+            <div [class.order-2]="isMyPost">
+                @if ($first) {
+                <img priority [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
+                } @else {
+                <img [ngSrc]="post.authorAvatar" [alt]="post.author + ' 头像'" width="40" height="40" class="h-10 w-10 rounded-full object-cover flex-shrink-0">
+                }
+            </div>
+
+            <!-- Message Bubble (DOM order: 2nd) -->
+            <div class="w-full max-w-md flex flex-col" [class.order-1]="isMyPost" [class.items-end]="isMyPost" [class.items-start]="!isMyPost">
+                <div [class]="'p-4 w-full rounded-xl ' + typeConfig.bubbleClasses + (isMyPost ? ' rounded-tr-none' : ' rounded-tl-none')" [class.shadow-lg]="isUrgent" [class.ring-2]="isUrgent" [class.ring-rose-500/50]="isUrgent" [class.shadow-sm]="!isUrgent">
+                    <!-- Bubble Header (Icon, Title, Priority, etc.) -->
+                    <div class="flex justify-between items-start gap-4">
+                        <h3 [class]="'font-bold text-base flex items-center gap-2 ' + typeConfig.headerTextClasses">
+                            <span [class]="typeConfig.iconClasses">{{ typeConfig.icon }}</span>
+                            <span>{{ typeConfig.title }}</span>
+                        </h3>
+                        <div class="flex items-center gap-2 shrink-0">
+                            @if (post.dueDate) {
+                            @let countdown = getCountdown(post.dueDate);
+                            @if (countdown) {
+                            <div [class]="'flex items-center gap-1.5 font-semibold text-sm ' + typeConfig.countdownClasses">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 animate-pulse">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>{{ countdown }}</span>
+                            </div>
+                            }
+                            }
+                            @if (post.priority) {
+                            <span [class]="'text-xs font-semibold px-3 py-1 rounded-full ' + typeConfig.priorityChipClasses(post.priority)">
+                                {{ getPriorityConfig(post.priority).text }}
+                            </span>
+                            }
+                        </div>
+                    </div>
+                    <!-- Bubble Content -->
+                    <p [class]="'mt-2 leading-relaxed ' + typeConfig.bodyTextClasses">{{ post.content }}</p>
+
+                    <!-- AI Analysis Section -->
+                    <div [class]="'mt-4 pt-3 border-t ' + typeConfig.separatorBorderClasses">
+                        @if (post.isLoadingAiSuggestion) {
+                        <div [class]="'flex items-center justify-center gap-2 text-sm p-2 ' + typeConfig.bodyTextClasses">
+                            <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>AI 正在分析中...</span>
+                        </div>
+                        } @else if (post.aiSuggestions && post.aiSuggestions.length > 0) {
+                        @let activeSuggestion = post.aiSuggestions[post.activeAiSuggestionIndex ?? 0];
+                        <div [class]="'prose prose-sm max-w-none ' + typeConfig.bodyTextClasses" [class.prose-invert]="isDarkCard(post.type)" [innerHTML]="activeSuggestion.content">
+                        </div>
+                        <!-- Controls -->
+                        <div class="mt-4 flex justify-between items-center gap-4">
+                            <!-- Navigation -->
+                            @if (post.aiSuggestions.length > 1) {
+                            <div class="flex items-center gap-3 text-sm font-semibold" [class.text-white]="isDarkCard(post.type)" [class.text-slate-600]="!isDarkCard(post.type)">
+                                <button (click)="changeSuggestion(post, 'prev')" [class]="'p-1 rounded-full transition-colors ' + typeConfig.reactionButtonClasses" aria-label="上一条建议">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <span class="text-xs w-16 text-center">建议 {{ (post.activeAiSuggestionIndex ?? 0) + 1 }} / {{ post.aiSuggestions.length }}</span>
+                                <button (click)="changeSuggestion(post, 'next')" [class]="'p-1 rounded-full transition-colors ' + typeConfig.reactionButtonClasses" aria-label="下一条建议">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 0-1.06L10.94 10 7.21 6.29a.75.75 0 1 1 1.06-1.06l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25-4.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            } @else {
+                            <!-- Spacer to keep regenerate button on the right -->
+                            <div></div>
+                            }
+
+                            <!-- Regenerate Button -->
+                            <button (click)="getAiAnalysisForPost(post)" [class]="'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                    <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201-4.42 5.5 5.5 0 0 1 10.842 2.162.75.75 0 0 1-1.49-.174.25.25 0 0 0-.493-.062c-.22.65-.54 1.253-.942 1.795a.75.75 0 0 1-1.054.093Z" clip-rule="evenodd" />
+                                    <path fill-rule="evenodd" d="M4.688 8.576a5.5 5.5 0 0 1 9.201 4.42 5.5 5.5 0 0 1-10.842-2.162.75.75 0 0 1 1.49.174.25.25 0 0 0 .493.062c.22-.65.54-1.253.942-1.795a.75.75 0 0 1 1.054-.093ZM10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>重新生成</span>
+                            </button>
+                        </div>
+
+                        } @else {
+                        <div class="flex justify-end">
+                            <button (click)="getAiAnalysisForPost(post)" [class]="'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">
+                                <span>✨ AI 分析</span>
+                            </button>
+                        </div>
+                        }
+                    </div>
+
+                    <!-- Bubble Footer (Reactions, Assignees) -->
+                    <div [class]="'mt-4 pt-3 border-t ' + typeConfig.separatorBorderClasses">
+                        <div class="flex justify-between items-end">
+                            <!-- Reactions -->
+                            <div class="flex flex-col gap-2">
+                                @for(reactionType of reactionTypes; track reactionType) {
+                                @let reactors = getReactionsByType(post, reactionType);
+                                @if(reactors.length > 0) {
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-bold w-20" [class.text-white]="isDarkCard(post.type)" [class.text-slate-600]="!isDarkCard(post.type)">
+                                        {{ getReactionConfig(reactionType).label }}
+                                    </span>
+                                    <div class="flex -space-x-2">
+                                        @for(reactor of reactors; track reactor.name) {
+                                        <img [ngSrc]="reactor.avatar" [alt]="reactor.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover ring-2" [class]="typeConfig.assigneeRingClasses">
+                                        }
+                                    </div>
+                                </div>
+                                }
+                                }
+                            </div>
+                            <!-- Timestamp -->
+                            <span [class]="'text-xs font-medium ' + typeConfig.timestampClasses">{{ post.timestamp | date:'shortTime' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div [class]="'mt-3 pt-3 border-t flex flex-wrap gap-2 ' + typeConfig.separatorBorderClasses">
+                        @if(!hasReacted(post, 'ILL_DO_IT')) {
+                        <button (click)="addReaction(post.id, 'ILL_DO_IT')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">我来做</button>
+                        }
+                        @if(!hasReacted(post, 'ILL_JOIN')) {
+                        <button (click)="addReaction(post.id, 'ILL_JOIN')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">我参加</button>
+                        }
+                        @if(!hasReacted(post, 'GOT_IT')) {
+                        <button (click)="addReaction(post.id, 'GOT_IT')" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">收到</button>
+                        }
+                        <button (click)="toggleCommentInput(post.id)" [class]="'text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ' + typeConfig.reactionButtonClasses">
+                            回复
+                        </button>
+                        @if(isUserInvolved(post) && post.status !== 'DONE') {
+                        <button (click)="markAsDone(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors bg-emerald-500/20 text-emerald-800 hover:bg-emerald-500/30">
+                            标记为完成
+                        </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comments section -->
+        @if(post.comments.length > 0 || commentingOnPostId() === post.id) {
+        <div class="mt-2 ml-12 w-[calc(100%-3rem)] space-y-2">
+            @for (comment of post.comments; track comment.id) {
+            <div class="flex items-start gap-2 animate-fade-in group">
+                <img [ngSrc]="comment.authorAvatar" [alt]="comment.author" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                <div class="flex-1 text-sm bg-slate-100 px-3 py-2 rounded-lg rounded-tl-none">
+                    <p class="font-semibold text-slate-800">{{ comment.author }}</p>
+                    <p class="text-slate-600">{{ comment.content }}</p>
+                </div>
+                @if(comment.author === loggedInUser()!.name) {
+                <button (click)="deletePostComment(post.id, comment.id)" class="p-1 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="删除评论">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.867 8.67A2 2 0 0 0 5.885 16h4.23a2 2 0 0 0 1.968-1.83L12.95 5.5h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 5.5l.85 8.5a.5.5 0 0 0 .496.45h4.208a.5.5 0 0 0 .496-.45l.85-8.5H6.05Z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                }
+            </div>
+            }
+            @if (commentingOnPostId() === post.id) {
+            <div class="flex items-start gap-2 animate-fade-in">
+                <img [ngSrc]="loggedInUser()!.avatar" [alt]="loggedInUser()!.name" width="24" height="24" class="w-6 h-6 rounded-full object-cover">
+                <div class="flex-1 space-y-2">
+                    <textarea [value]="newCommentContent()" (input)="onCommentInput($event)" rows="2" placeholder="写下你的回复..." class="w-full text-sm bg-white p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                    <div class="flex items-center gap-2">
+                        <button (click)="submitComment(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-sky-500 text-white hover:bg-sky-600">发送</button>
+                        <button (click)="toggleCommentInput(post.id)" class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300">取消</button>
+                    </div>
+                </div>
+            </div>
+            }
+        </div>
+        }
+    </div>
+    }
+    } @else {
+    <div class="text-center py-16 text-slate-500">
+        <p>这里还没有内容。</p>
+        @if(activeFamily()?.inviteCode) {
+        <p class="mt-4 text-sm">邀请家人加入 <span class="font-bold text-slate-700">{{ activeFamily()?.name }}</span>！</p>
+        <p class="mt-1 text-xs text-slate-400">分享您的邀请码:</p>
+        <p class="mt-1 text-lg font-mono p-2 bg-slate-200 rounded-md inline-block">{{ activeFamily()?.inviteCode }}</p>
+        }
+    </div>
+    }
+</main>
