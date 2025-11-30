@@ -243,7 +243,7 @@ export class DataService {
 
     private getCurrentWeather(latitude: number, longitude: number): Observable<WeatherInfo> {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
-      // FIX: Provide a generic type for the http.get call to properly type the response.
+      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
       return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
         map((response) => ({
           temperature: response.current.temperature_2m,
@@ -255,7 +255,7 @@ export class DataService {
     
     private getCurrentAirQuality(latitude: number, longitude: number): Observable<AirQualityInfo> {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
-      // FIX: Provide a generic type for the http.get call to properly type the response.
+      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
       return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
         map((response) => ({
           aqi: response.current.us_aqi,
@@ -271,7 +271,7 @@ export class DataService {
 
     private getLocationName(latitude: number, longitude: number): Observable<string | null> {
       const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
-      // FIX: Provide a generic type for the http.get call to properly type the response.
+      // FIX: Add a generic type to the http.get call to ensure the response object is correctly typed and not 'unknown'.
       return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
           map((response) => {
               if (response.results && response.results.length > 0) {

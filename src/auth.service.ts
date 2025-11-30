@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Assignee, Family, MockFamily, MockUser, AuthResponse } from './types';
 import { API_BASE_URL, USE_MOCK_API, DEV_AUTO_LOGIN, DEV_DEFAULT_USER } from './config';
 import { Observable, of, throwError, delay } from 'rxjs';
-import { tap, catchError, map } from 'rxjs';
+import { tap, catchError, map, switchMap } from 'rxjs';
 
 // --- Mock Data Store ---
 // This will act as our in-memory database for the mock API.
@@ -130,7 +130,7 @@ export class AuthService {
     );
   }
 
-  createFamily(familyName: string): Observable<Family> {
+  createFamily(familyName: string): Observable<AuthResponse> {
     if (USE_MOCK_API) {
       const currentUser = this.currentUser();
       if (!currentUser) return throwError(() => new Error('用户未登录'));
@@ -138,8 +138,9 @@ export class AuthService {
       const userRecord = MOCK_USERS.find(u => u.assigneeId === currentUser.id);
       if (!userRecord) return throwError(() => new Error('无法找到用户记录'));
 
+      const newFamilyId = `fam_${Date.now()}`;
       const newFamily: MockFamily = {
-        id: `fam_${Date.now()}`,
+        id: newFamilyId,
         name: familyName,
         memberIds: [currentUser.id],
         inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
@@ -147,25 +148,18 @@ export class AuthService {
       MOCK_FAMILIES.push(newFamily);
       userRecord.familyIds.push(newFamily.id);
       
-      const newFullFamily: Family = {
-        ...newFamily,
-        members: [currentUser],
-      }
-      this.userFamilies.update(families => [...families, newFullFamily]);
-      this.activeFamily.set(newFullFamily);
-
-      return of(newFullFamily).pipe(delay(500));
+      // Instead of manually updating signals, delegate to switchFamily
+      // to get a full, authoritative session update.
+      return this.switchFamily(newFamilyId);
     }
     return this.http.post<Family>(`${API_BASE_URL}/families`, { name: familyName }).pipe(
-      // FIX: Explicitly type the 'family' parameter to resolve ambiguity.
-      tap((family: Family) => {
-        this.userFamilies.update(families => [...families, family]);
-        this.activeFamily.set(family);
-      })
+      // After creating the family, switch to it to get a fresh AuthResponse
+      // and update the session state correctly.
+      switchMap((family: Family) => this.switchFamily(family.id))
     );
   }
 
-  joinFamily(inviteCode: string): Observable<Family> {
+  joinFamily(inviteCode: string): Observable<AuthResponse> {
      if (USE_MOCK_API) {
       const currentUser = this.currentUser();
       if (!currentUser) return throwError(() => new Error('用户未登录'));
@@ -183,23 +177,14 @@ export class AuthService {
       familyToJoin.memberIds.push(currentUser.id);
       userRecord.familyIds.push(familyToJoin.id);
 
-      const members = familyToJoin.memberIds.map(id => ALL_ASSIGNEES.find(a => a.id === id)!).filter(Boolean);
-      const joinedFullFamily: Family = {
-          ...familyToJoin,
-          members,
-      };
-
-      this.userFamilies.update(families => [...families, joinedFullFamily]);
-      this.activeFamily.set(joinedFullFamily);
-      
-      return of(joinedFullFamily).pipe(delay(500));
+      // Instead of manually updating signals, delegate to switchFamily
+      // to get a full, authoritative session update.
+      return this.switchFamily(familyToJoin.id);
     }
     return this.http.post<Family>(`${API_BASE_URL}/families/join`, { inviteCode }).pipe(
-      // FIX: Explicitly type the 'family' parameter to resolve ambiguity.
-      tap((family: Family) => {
-        this.userFamilies.update(families => [...families, family]);
-        this.activeFamily.set(family);
-      })
+      // After joining the family, switch to it to get a fresh AuthResponse
+      // and update the session state correctly.
+      switchMap((family: Family) => this.switchFamily(family.id))
     );
   }
 
@@ -210,7 +195,7 @@ export class AuthService {
             return throwError(() => new Error('User not found')).pipe(delay(300));
         }
         
-        const familyExists = this.userFamilies().some(f => f.id === familyId);
+        const familyExists = MOCK_FAMILIES.some(f => f.id === familyId);
         if (familyExists) {
             const authResponse = this._buildMockAuthResponse(user, familyId);
             return of(authResponse).pipe(
