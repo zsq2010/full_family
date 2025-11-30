@@ -264,9 +264,18 @@ export class AppComponent implements OnInit, OnDestroy {
         this.isFamilySwitcherOpen.set(false);
         return;
     }
-    this.authService.switchFamily(familyId);
-    this.isFamilySwitcherOpen.set(false);
-    this.activeHomeTab.set('all'); // Reset home tab on switch
+    this.familyError.set(null);
+    this.authService.switchFamily(familyId).subscribe({
+      next: () => {
+        this.isFamilySwitcherOpen.set(false);
+        this.activeHomeTab.set('all'); // Reset home tab on switch
+      },
+      error: (err) => {
+        console.error('Failed to switch family', err);
+        this.familyError.set(err.message || '切换家庭失败。');
+        this.isFamilySwitcherOpen.set(false);
+      }
+    });
   }
 
   // --- UI Navigation & Interaction ---

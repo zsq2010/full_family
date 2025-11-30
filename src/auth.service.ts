@@ -70,7 +70,8 @@ export class AuthService {
     }
 
     return this.http.get<AuthResponse>(`${API_BASE_URL}/auth/me`).pipe(
-      tap(response => this._setSession(response)),
+      // FIX: Explicitly type the 'response' parameter to resolve ambiguity.
+      tap((response: AuthResponse) => this._setSession(response)),
       catchError(() => {
         this._clearSession();
         return of(null);
@@ -90,7 +91,8 @@ export class AuthService {
     }
 
     return this.http.post<AuthResponse>(`${API_BASE_URL}/auth/login`, { username, password }).pipe(
-      tap(response => this._setSession(response))
+      // FIX: Explicitly type the 'response' parameter to resolve ambiguity.
+      tap((response: AuthResponse) => this._setSession(response))
     );
   }
 
@@ -123,7 +125,8 @@ export class AuthService {
     }
     
     return this.http.post<AuthResponse>(`${API_BASE_URL}/auth/register`, { username, displayName, password }).pipe(
-      tap(response => this._setSession(response))
+      // FIX: Explicitly type the 'response' parameter to resolve ambiguity.
+      tap((response: AuthResponse) => this._setSession(response))
     );
   }
 
@@ -154,7 +157,8 @@ export class AuthService {
       return of(newFullFamily).pipe(delay(500));
     }
     return this.http.post<Family>(`${API_BASE_URL}/families`, { name: familyName }).pipe(
-      tap(family => {
+      // FIX: Explicitly type the 'family' parameter to resolve ambiguity.
+      tap((family: Family) => {
         this.userFamilies.update(families => [...families, family]);
         this.activeFamily.set(family);
       })
@@ -191,7 +195,8 @@ export class AuthService {
       return of(joinedFullFamily).pipe(delay(500));
     }
     return this.http.post<Family>(`${API_BASE_URL}/families/join`, { inviteCode }).pipe(
-      tap(family => {
+      // FIX: Explicitly type the 'family' parameter to resolve ambiguity.
+      tap((family: Family) => {
         this.userFamilies.update(families => [...families, family]);
         this.activeFamily.set(family);
       })
@@ -201,19 +206,24 @@ export class AuthService {
   switchFamily(familyId: string): Observable<AuthResponse> {
     if (USE_MOCK_API) {
         const user = MOCK_USERS.find(u => u.assigneeId === this.currentUser()?.id);
-        if (!user) return throwError(() => new Error('User not found'));
+        if (!user) {
+            return throwError(() => new Error('User not found')).pipe(delay(300));
+        }
         
         const familyExists = this.userFamilies().some(f => f.id === familyId);
         if (familyExists) {
             const authResponse = this._buildMockAuthResponse(user, familyId);
-            this._setSession(authResponse);
-            return of(authResponse);
+            return of(authResponse).pipe(
+                delay(300), // 1. 模拟网络延迟
+                tap(response => this._setSession(response)) // 2. 延迟之后再更新状态
+            );
         }
-        return throwError(() => new Error('Family not found'));
+        return throwError(() => new Error('Family not found')).pipe(delay(300));
     }
 
     return this.http.post<AuthResponse>(`${API_BASE_URL}/families/${familyId}/switch`, {}).pipe(
-        tap(response => this._setSession(response))
+        // FIX: Explicitly type the 'response' parameter to resolve ambiguity.
+        tap((response: AuthResponse) => this._setSession(response))
     );
   }
 
