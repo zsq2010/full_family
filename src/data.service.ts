@@ -307,6 +307,7 @@ export class DataService {
             let updatedItem: InventoryItem | undefined;
             this.inventory.update((items: InventoryItem[]) => items.map((item: InventoryItem) => {
                 if (item.id === itemId) {
+                    // FIX: Add explicit cast to satisfy TypeScript compiler.
                     updatedItem = { ...item, ...itemData } as InventoryItem;
                     return updatedItem;
                 }
@@ -332,7 +333,8 @@ export class DataService {
 
     updateInventoryItemStatus(itemId: number, status: InventoryStatus): Observable<void> {
         if (USE_MOCK_API) {
-            this.inventory.update((items: InventoryItem[]) => items.map((item: InventoryItem) =>
+            // FIX: Add explicit return type to map() callback to fix type inference issue.
+            this.inventory.update((items: InventoryItem[]) => items.map((item: InventoryItem): InventoryItem =>
                 item.id === itemId ? { ...item, status } : item
             ));
             return of(undefined).pipe(delay(100));
@@ -375,11 +377,11 @@ export class DataService {
                 content: content,
                 timestamp: new Date().toISOString(),
             };
-            // FIX: Use a safer spread syntax for optional arrays to aid type inference.
             this.inventory.update((items: InventoryItem[]) => items.map((item: InventoryItem) => {
                 if (item.id === itemId) {
-                    const comments = [...(item.comments || []), newComment];
-                    return { ...item, comments };
+                    const comments: InventoryItemComment[] = [...(item.comments || []), newComment];
+                    // FIX: Add explicit cast to ensure the returned object is of type InventoryItem.
+                    return { ...item, comments } as InventoryItem;
                 }
                 return item;
             }));
@@ -391,11 +393,11 @@ export class DataService {
 
         return this.http.post<InventoryItemComment>(url, { content }).pipe(
             tap(newComment => {
-                // FIX: Use a safer spread syntax for optional arrays to aid type inference.
                 this.inventory.update((items: InventoryItem[]) => items.map((item: InventoryItem) => {
                     if (item.id === itemId) {
                         const comments = [...(item.comments || []), newComment];
-                        return { ...item, comments };
+                        // FIX: Add explicit cast to ensure the returned object is of type InventoryItem.
+                        return { ...item, comments } as InventoryItem;
                     }
                     return item;
                 }));
@@ -470,6 +472,7 @@ export class DataService {
             // FIX: Rewrite update logic to be more explicit, helping the compiler infer the correct array type.
             this.healthLogs.update((current: HealthLog[]) => {
                 const updatedLogs = [newLog, ...current];
+                // FIX: Let TypeScript infer types for sort callback parameters.
                 return updatedLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
             });
             return of(newLog).pipe(delay(300));
@@ -521,9 +524,9 @@ export class DataService {
 
     private getCurrentWeather(latitude: number, longitude: number): Observable<WeatherInfo> {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
-      // FIX: Add explicit type to http.get to correctly handle API response and prevent accessing properties on 'unknown'.
+      // FIX: Add explicit type to http.get and map callback parameter to correctly handle API response.
       return this.http.get<{ current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }>(url).pipe(
-        map((response) => ({
+        map((response: { current: { temperature_2m: number; relative_humidity_2m: number; weather_code: number; } }) => ({
           temperature: response.current.temperature_2m,
           humidity: response.current.relative_humidity_2m,
           weatherCode: response.current.weather_code,
@@ -533,9 +536,9 @@ export class DataService {
     
     private getCurrentAirQuality(latitude: number, longitude: number): Observable<AirQualityInfo> {
       const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
-      // FIX: Add explicit type to http.get to correctly handle API response and prevent accessing properties on 'unknown'.
+      // FIX: Add explicit type to http.get and map callback parameter to correctly handle API response.
       return this.http.get<{ current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }>(url).pipe(
-        map((response) => ({
+        map((response: { current: { us_aqi: number; pm2_5: number; pm10: number; carbon_monoxide: number; nitrogen_dioxide: number; sulphur_dioxide: number; ozone: number; } }) => ({
           aqi: response.current.us_aqi,
           pm2_5: response.current.pm2_5,
           pm10: response.current.pm10,
@@ -549,9 +552,9 @@ export class DataService {
 
     private getLocationName(latitude: number, longitude: number): Observable<string | null> {
       const url = `https://geocoding-api.open-meteo.com/v1/search?latitude=${latitude}&longitude=${longitude}&count=1&language=zh_CN`;
-      // FIX: Add explicit type to http.get to correctly handle API response and prevent accessing properties on 'unknown'.
+      // FIX: Add explicit type to http.get and map callback parameter to correctly handle API response.
       return this.http.get<{ results?: { name: string; admin1: string; country: string; }[] }>(url).pipe(
-          map((response) => {
+          map((response: { results?: { name: string; admin1: string; country: string; }[] }) => {
               if (response.results && response.results.length > 0) {
                   const result = response.results[0];
                   const parts = [result.name, result.admin1, result.country].filter(Boolean);

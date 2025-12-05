@@ -18,6 +18,7 @@ export class ProfileComponent {
   activeFamily = this.authService.activeFamily;
   
   logout(): void {
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.authService.logout().subscribe(() => {
       this.router.navigate(['/home']);
     });

@@ -174,6 +174,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
 
   logout(): void {
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.authService.logout().subscribe(() => {
       this.loginForm.reset();
       this.registerForm.reset();
@@ -237,6 +238,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     // NOTE: Editing is handled within the InventoryComponent now. 
     // This global form is only for creating new items.
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.dataService.addInventoryItem(itemData).subscribe(() => {
         this.closeNewItemPanel();
         this.router.navigate(['/inventory']);
@@ -266,6 +268,7 @@ export class AppComponent implements OnInit, OnDestroy {
         break;
     }
 
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.dataService.addPost(newPost).subscribe(newPostWithId => {
         this.router.navigate(['/home']);
         this.isFabMenuOpen.set(false);
@@ -296,6 +299,7 @@ export class AppComponent implements OnInit, OnDestroy {
         subject: type === 'FEELING' ? currentUser : undefined,
     };
     
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.dataService.addPost(newPost).subscribe(newPostWithId => {
         this.closeNewPostPanel();
         this.router.navigate(['/home']);

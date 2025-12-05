@@ -127,6 +127,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         return;
     }
     this.familyError.set(null);
+    // FIX: Use `this.router` directly. Arrow functions in `subscribe` preserve the `this` context.
     this.authService.switchFamily(familyId).subscribe({
       next: () => {
         this.isFamilySwitcherOpen.set(false);
