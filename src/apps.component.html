@@ -1,0 +1,38 @@
+<div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2">
+    <div class="relative flex justify-center items-center border-b border-slate-200 pb-2">
+        <a routerLink="/profile" class="absolute left-0 p-2 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+            </svg>
+        </a>
+        <h1 class="text-lg font-bold text-slate-800">应用配置</h1>
+    </div>
+</div>
+
+<main class="mt-6 space-y-4">
+    @for(entry of userApps(); track entry.application.id) {
+        <a [routerLink]="['/apps', entry.application.id]" class="block bg-white p-4 rounded-lg shadow-sm border border-slate-100 animate-fade-in-down hover:shadow-md hover:border-slate-200 transition-all">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h2 class="text-base font-bold text-slate-800">{{ entry.application.name }}</h2>
+                    <p class="text-sm text-slate-500 mt-1">{{ entry.application.description }}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-slate-400 flex-shrink-0 ml-2">
+                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 0-1.06L10.94 10 7.21 6.29a.75.75 0 1 1 1.06-1.06l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25-4.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                <span class="text-sm font-medium text-slate-700">服务状态</span>
+                @if(isAppEnabled(entry)) {
+                    <span class="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">已启用</span>
+                } @else {
+                    <span class="text-xs font-semibold px-2 py-1 rounded-full bg-slate-200 text-slate-600">已禁用</span>
+                }
+            </div>
+        </a>
+    } @empty {
+        <div class="text-center py-16 text-slate-500">
+            <p>没有可用的应用配置。</p>
+        </div>
+    }
+</main>

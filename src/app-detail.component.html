@@ -1,0 +1,93 @@
+<div class="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2">
+    <div class="relative flex justify-center items-center border-b border-slate-200 pb-2">
+        <a routerLink="/apps" class="absolute left-0 p-2 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+            </svg>
+        </a>
+        @if (appEntry(); as entry) {
+            <h1 class="text-lg font-bold text-slate-800">{{ entry.application.name }}</h1>
+        }
+    </div>
+</div>
+
+<main class="mt-6">
+    @if (appEntry(); as entry) {
+    <form [formGroup]="configForm" (ngSubmit)="saveChanges()" class="space-y-6">
+        <p class="text-sm text-slate-600">{{ entry.application.description }}</p>
+        
+        <!-- Main Enable/Disable Toggle -->
+        @if(configForm.get('userSettings')) {
+            <div formGroupName="userSettings" class="bg-white p-4 rounded-lg shadow-sm border border-slate-100 flex justify-between items-center">
+                <span class="text-sm font-medium text-slate-700">启用服务</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" formControlName="enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                </label>
+            </div>
+        }
+
+        <!-- Other Configs -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100 space-y-4">
+            @for (key of configKeys(); track key) {
+                @let control = configForm.get(key);
+                @let controlValue = control?.value;
+                @let valueType = getValueType(controlValue);
+
+                @if (valueType === 'object') {
+                    <div [formGroupName]="key" class="space-y-3 pt-3 border-t border-slate-100 first:border-t-0 first:pt-0">
+                        <h3 class="text-sm font-bold text-slate-600 capitalize">{{ key }} 设置</h3>
+                        @for(subKey of getObjectKeys(controlValue); track subKey) {
+                            <div class="flex flex-col">
+                                <label [for]="key + '-' + subKey" class="block text-sm font-medium text-slate-700 capitalize">{{ subKey }}</label>
+                                <input [id]="key + '-' + subKey" [formControlName]="subKey" type="text" class="mt-1 block w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+                            </div>
+                        }
+                    </div>
+                } @else {
+                     <div class="flex items-center justify-between pt-3 border-t border-slate-100 first:border-t-0 first:pt-0">
+                        <label [for]="key" class="block text-sm font-medium text-slate-700 capitalize">{{ key }}</label>
+                        @switch (valueType) {
+                            @case ('boolean') {
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input [id]="key" type="checkbox" [formControlName]="key" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                                </label>
+                            }
+                            @case ('number') {
+                                 <input [id]="key" [formControlName]="key" type="number" class="mt-1 block w-1/2 px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-right">
+                            }
+                            @case ('string') {
+                                 <input [id]="key" [formControlName]="key" type="text" class="mt-1 block w-1/2 px-3 py-2 bg-slate-50 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-right">
+                            }
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <button type="submit" [disabled]="configForm.invalid || isSaving() || !configForm.dirty" class="w-full sm:w-auto flex justify-center items-center gap-2 py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                 @if(isSaving()) {
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>保存中...</span>
+                } @else {
+                    <span>保存更改</span>
+                }
+            </button>
+        </div>
+    </form>
+    } @else {
+        <div class="text-center py-16 text-slate-500">
+            @if (appId()) {
+            <p>未找到ID为 "{{ appId() }}" 的应用配置。</p>
+            } @else {
+            <p>正在加载应用配置...</p>
+            }
+        </div>
+    }
+</main>

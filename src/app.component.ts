@@ -18,9 +18,10 @@ type PostCategory = 'daily' | 'health' | 'knowledge';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
-  private authService = inject(AuthService);
-  private dataService = inject(DataService);
-  private router = inject(Router);
+  // FIX: Explicitly type injected services to resolve 'property does not exist on type unknown' errors.
+  private authService: AuthService = inject(AuthService);
+  private dataService: DataService = inject(DataService);
+  private router: Router = inject(Router);
 
   // --- Auth & Data State ---
   loggedInUser = this.authService.currentUser;

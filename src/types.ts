@@ -157,3 +157,41 @@ export interface AuthResponse {
   families: Family[];
   activeFamilyId: string | null;
 }
+
+// --- New Types for App Configuration ---
+
+export type ConfigData = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+} | null;
+
+export interface Application {
+  id: string;
+  name: string;
+  description: string;
+  defaultConfig: ConfigData;
+  createdAt: string;
+  updatedAt: string;
+  status?: string;
+}
+
+export interface AppConfig {
+  id: string;
+  userId: number;
+  appId: string;
+  environment: string;
+  configData: ConfigData;
+  application?: Application;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserApplicationEntry {
+    application: Application;
+    appConfigs: AppConfig[];
+}
+
+export interface UserApplicationsResponse {
+    systemSettings: { [key: string]: string };
+    applications: UserApplicationEntry[];
+}

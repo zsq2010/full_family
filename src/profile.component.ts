@@ -1,18 +1,19 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NgOptimizedImage } from '@angular/common';
 
 import { AuthService } from './auth.service';
 
 @Component({
   selector: 'app-profile',
-  imports: [NgOptimizedImage],
+  imports: [NgOptimizedImage, RouterLink],
   templateUrl: './profile.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileComponent {
-  private authService = inject(AuthService);
-  private router = inject(Router);
+  // FIX: Explicitly typing injected services to fix type inference issues causing '... on type unknown' errors.
+  private authService: AuthService = inject(AuthService);
+  private router: Router = inject(Router);
 
   loggedInUser = this.authService.currentUser;
   activeFamily = this.authService.activeFamily;

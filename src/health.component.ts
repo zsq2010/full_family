@@ -20,8 +20,9 @@ type EnvironmentState = 'idle' | 'loading' | 'success' | 'error';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HealthComponent implements OnInit {
-  private authService = inject(AuthService);
-  private dataService = inject(DataService);
+  // FIX: Explicitly typing injected services for consistency and to prevent potential type inference errors.
+  private authService: AuthService = inject(AuthService);
+  private dataService: DataService = inject(DataService);
 
   loggedInUser = this.authService.currentUser;
   healthLogs = this.dataService.healthLogs;

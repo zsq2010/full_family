@@ -19,9 +19,10 @@ type ActiveHomeTab = 'all' | 'daily' | 'health' | 'knowledge';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeComponent implements OnInit, OnDestroy {
-  private authService = inject(AuthService);
-  private dataService = inject(DataService);
-  private router = inject(Router);
+  // FIX: Explicitly typing injected services to fix type inference issues causing '... on type unknown' errors.
+  private authService: AuthService = inject(AuthService);
+  private dataService: DataService = inject(DataService);
+  private router: Router = inject(Router);
   private ai!: GoogleGenAI;
 
   // --- Auth & Data State ---

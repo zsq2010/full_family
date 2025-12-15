@@ -13,8 +13,9 @@ import { InventoryItem, InventoryStatus, InventoryCategory } from './types';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InventoryComponent implements OnInit {
-  private authService = inject(AuthService);
-  private dataService = inject(DataService);
+  // FIX: Explicitly typing injected services for consistency and to prevent potential type inference errors.
+  private authService: AuthService = inject(AuthService);
+  private dataService: DataService = inject(DataService);
 
   loggedInUser = this.authService.currentUser;
   inventory = this.dataService.inventory;

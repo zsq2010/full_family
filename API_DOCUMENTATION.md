@@ -1,280 +1,175 @@
-# 家事 App - API 文档 (v2.0)
+# 应用配置 API 文档 (v2.2)
 
 ## 1. 简介
 
-本文档提供了“家事” (Family Care) 应用后端的 API 规范。后端应提供一个 RESTful API 供 Angular 前端使用。
+本文档详细说明了“家事” (Family Care) 应用后端关于**应用程序元数据 (Application Metadata)** 和 **用户个性化配置 (AppConfig)** 的 API 规范。
+
+文档已更新以反映当前代码的实际行为（v2.2），并仅关注后端接口契约。
 
 -   **基础 URL**: `/api/v1`
--   **身份验证**: API 应为**无状态的**，并使用 **Token 认证**。所有受保护的端点都必须在 `Authorization` 请求头中包含一个有效的 Bearer Token (`Bearer <token>`)。
--   **核心概念：数据范围 (Data Scoping)**: 所有核心资源（帖子、物资清单、健康日志）都**必须**通过家庭 ID 进行访问。这确保了严格的数据隔离和安全性。后端应在处理每个请求时，验证 Token 中包含的用户信息是否有权访问路径中指定的 `{familyId}`。
--   **数据格式**: 所有请求和响应体均为 JSON 格式。
+-   **身份验证**: Bearer Token (`Authorization: Bearer <token>`)。
+-   **数据格式**: JSON。
 
 ---
 
-## 2. 数据模型
+## 2. 数据结构说明
 
-这些是整个 API 中使用的主要数据结构，基于前端的 `src/types.ts` 文件。
+以下描述了 API 请求和响应中使用的主要 JSON 对象结构。
 
-### Assignee (用户/成员)
-```typescript
-interface Assignee {
-  id: number; // 用户的唯一标识符
-  name: string; // 用户在家庭中的称呼
-  avatar: string; // 头像 URL
-  age?: number;
-}
-```
+### ConfigData (配置数据)
+一个灵活的 JSON 对象 (`Object`)，用于存储任意结构的配置内容。
+- **推荐约定**: 若需支持用户级"启用/禁用"，请在 JSON 中包含 `"userSettings": { "enabled": boolean }` 对象。
+- **类型**: Object 或 null
 
-### Family (家庭)
-```typescript
-interface Family {
-  id: string; // 家庭的唯一标识符 (例如: "fam_...")
-  name: string; // 家庭名称
-  members: Assignee[]; // 家庭成员列表
-  inviteCode: string; // 用于邀请新成员的唯一代码
-}
-```
+### Application (应用元数据)
+描述应用程序的基础信息。
 
-### Post, Comment, InventoryItem 等
-其他数据模型（如 `Post`, `Comment`, `InventoryItem`, `HealthLog`）与旧文档或 `src/types.ts` 中的定义保持一致，但所有这些资源现在都与一个特定的 `Family` 关联。
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | String | 应用唯一标识 (如 "frontend-dashboard") |
+| `name` | String | 应用名称 |
+| `description` | String | 应用描述 |
+| `defaultConfig` | ConfigData | 默认配置对象 |
+| `createdAt` | String | ISO 8601 时间戳 |
+| `updatedAt` | String | ISO 8601 时间戳 |
+
+### AppConfig (用户应用配置)
+描述用户针对特定应用和环境的个性化配置。
+
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | String | 配置记录的 UUID |
+| `userId` | Number | 所属用户 ID |
+| `appId` | String | 关联的应用 ID |
+| `environment` | String | 环境标识 (如 "production", "development") |
+| `configData` | ConfigData | 用户覆盖的配置数据 |
+| `application` | Object | (可选) 嵌套的应用元数据对象 |
+| `createdAt` | String | ISO 8601 时间戳 |
+| `updatedAt` | String | ISO 8601 时间戳 |
 
 ---
 
-## 3. 身份验证 API
+## 3. 核心初始化接口
 
-处理用户注册、登录和 Token 管理。
+页面加载时最常用的接口。
 
-### `POST /api/v1/auth/register`
+### `GET /api/v1/applications/user`
 
-创建一个新用户账户。
+获取所有可用的应用，并附带当前用户的个性化配置。
 
--   **请求体**:
+-   **特点**: 
+    -   即使没有配置，也会返回应用元数据（`appConfigs` 为空数组）。
+    -   **精简响应**: `appConfigs` 列表中的对象**不包含**冗余的 nested `application` 字段。
+-   **响应体**: JSON 对象 (Composite Response)
     ```json
     {
-      "username": "newuser",
-      "displayName": "新成员",
-      "password": "strongpassword123"
-    }
-    ```
--   **响应**:
-    -   `201 Created`: 注册成功。响应体包含初始的 `AuthResponse` 对象。
-    -   `400 Bad Request`: 输入无效（例如，用户名已存在）。
-
-### `POST /api/v1/auth/login`
-
-验证用户身份并返回一个 Access Token。
-
--   **请求体**:
-    ```json
-    {
-      "username": "me",
-      "password": "password123"
-    }
-    ```
--   **响应 (`AuthResponse`)**:
-    -   `200 OK`: 登录成功。
-        ```json
+      "systemSettings": {
+        "GLOBAL_HTTP_PROXY": "http://company-proxy:8888",
+        "OPENAI_API_BASE": "https://api.openai-proxy.com/v1"
+      },
+      "applications": [
         {
-          "accessToken": "ey...",
-          "user": { "id": 1, "name": "我", "avatar": "...", "age": 25 },
-          "families": [
-            { "id": "fam_demo", "name": "演示家庭", "members": [...], "inviteCode": "DEMO123" }
-          ],
-          "activeFamilyId": "fam_demo" // 默认激活第一个家庭
+          "application": {
+            "id": "app-theme-settings",
+            "name": "APP主题设置",
+            "description": "管理应用外观、主题和UI偏好设置。",
+            "defaultConfig": { "userSettings": { "enabled": true }, "initialTheme": "light" },
+            "createdAt": "...",
+            "updatedAt": "..."
+          },
+          "appConfigs": [
+            {
+              "id": "appconf_me_theme_dev",
+              "userId": 6117,
+              "appId": "app-theme-settings",
+              "environment": "development",
+              "configData": { "userSettings": { "enabled": true }, "theme": "dark" },
+              "createdAt": "...",
+              "updatedAt": "..."
+              // 注意：此处没有 "application" 字段
+            }
+          ]
         }
-        ```
-    -   `401 Unauthorized`: 凭据无效。
-
-### `POST /api/v1/auth/logout`
-
-（可选）使 Token 失效。这是一个好的实践，但对于无状态 JWT 来说不是必需的。
-
--   **请求头**: `Authorization: Bearer <token>`
--   **响应**:
-    -   `204 No Content`: 登出成功。
-
-### `GET /api/v1/auth/me`
-
-通过验证当前 Token，检索用户的完整会话信息。
-
--   **请求头**: `Authorization: Bearer <token>`
--   **响应**:
-    -   `200 OK`: Token 有效。响应体结构与 `/auth/login` 成功时的 `AuthResponse` 相同（可以不返回新的 accessToken）。
-    -   `401 Unauthorized`: Token 无效或已过期。
+      ]
+    }
+    ```
 
 ---
 
-## 4. 家庭管理 API
+## 4. 用户配置管理 API (AppConfig)
 
-管理用户所属的家庭。所有端点都需要 `Authorization` 头。
+用于对单一配置项进行增删改查。这些接口通常**会**返回关联的 `application` 详情。
 
-### `POST /api/v1/families`
+### `GET /api/v1/appconfigs`
 
-创建一个新家庭。创建者自动成为该家庭的第一个成员。
+列出用户的配置。
+
+-   **查询参数**: `appId` (可选)
+-   **响应**: `AppConfig` 对象数组 (包含嵌套的 `application` 对象)
+    ```json
+    [
+      {
+        "id": "...",
+        "appId": "frontend-dashboard",
+        "configData": { ... },
+        "application": { 
+           "id": "frontend-dashboard",
+           "name": "前端管理面板",
+           ...
+        }
+      }
+    ]
+    ```
+
+### `GET /api/v1/appconfigs/by-app-env`
+
+-   **查询参数**: `appId` (必填), `environment` (必填)
+-   **响应**: 单个 `AppConfig` 对象
+
+### `POST /api/v1/appconfigs`
+
+创建配置。
 
 -   **请求体**:
     ```json
     {
-      "name": "快乐一家"
+      "appId": "frontend-dashboard",
+      "environment": "production",
+      "configData": { "theme": "dark" }
     }
     ```
--   **响应**:
-    -   `201 Created`: 返回新创建的完整 `Family` 对象。
+-   **响应**: `201 Created` (返回完整对象，包含 `application`)
 
-### `POST /api/v1/families/join`
+### `PATCH /api/v1/appconfigs/{id}`
 
-使用邀请码加入一个现有的家庭。
+更新配置数据。
 
 -   **请求体**:
     ```json
     {
-      "inviteCode": "DEMO123"
+      "configData": { "newSetting": "value" }
     }
     ```
--   **响应**:
-    -   `200 OK`: 成功加入。返回加入的 `Family` 对象。
-    -   `400 Bad Request`: 邀请码无效或用户已是该家庭成员。
-    -   `404 Not Found`: 找不到使用该邀请码的家庭。
+-   **响应**: `200 OK` (返回完整对象，包含 `application`)
 
-### `POST /api/v1/families/{familyId}/switch`
+### `DELETE /api/v1/appconfigs/{id}`
 
-在用户的会话中切换当前激活的家庭。后端应返回一个新的 Token 或更新后的 `AuthResponse`，其中包含新的 `activeFamilyId`。
-
--   **路径参数**:
-    -   `familyId` (string): 要激活的家庭 ID。
--   **响应**:
-    -   `200 OK`: 返回更新后的 `AuthResponse` 对象。
-    -   `403 Forbidden`: 用户不是该家庭的成员。
-    -   `404 Not Found`: 家庭不存在。
+-   **响应**: `200 OK`
 
 ---
 
-## 5. 帖子 API
+## 5. 应用元数据管理 API (Application)
 
-所有帖子都与一个特定的家庭相关联。所有端点都需要 `Authorization` 头。
+系统级接口。
 
-### `GET /api/v1/families/{familyId}/posts`
+### `GET /api/v1/applications`
+列出所有应用。
 
-获取指定家庭的所有帖子列表，按时间倒序。
+### `GET /api/v1/applications/{id}`
+获取单个应用详情。
 
--   **路径参数**:
-    -   `familyId` (string): 目标家庭的 ID。
--   **响应**:
-    -   `200 OK`: 返回一个 `Post` 对象数组。
-    -   `403 Forbidden`: 用户无权访问该家庭。
+### `POST /api/v1/applications`
+创建新应用。
 
-### `POST /api/v1/families/{familyId}/posts`
-
-在指定家庭中创建一个新帖子。
-
--   **路径参数**: `familyId` (string)
--   **请求体**: `Omit<Post, 'id' | 'author' | 'authorAvatar' | 'timestamp' | ...>`
--   **响应**:
-    -   `201 Created`: 返回完整、新创建的 `Post` 对象。
-
-### `POST /api/v1/families/{familyId}/posts/{postId}/reactions`
-
-为帖子添加一个回应。
-
--   **路径参数**: `familyId`, `postId`
--   **请求体**: `{ "type": "ILL_DO_IT" }`
--   **响应**: `204 No Content`。
-
-### `POST /api/v1/families/{familyId}/posts/{postId}/comments`
-
-向帖子添加一条评论。
-
--   **路径参数**: `familyId`, `postId`
--   **请求体**: `{ "content": "..." }`
--   **响应**: `201 Created`，返回新创建的 `Comment` 对象。
-
-### `DELETE /api/v1/families/{familyId}/posts/{postId}/comments/{commentId}`
-
-删除一条评论。需要验证用户是否为评论作者。
-
--   **路径参数**: `familyId`, `postId`, `commentId`
--   **响应**: `204 No Content`。
-
-### `PATCH /api/v1/families/{familyId}/posts/{postId}`
-
-更新一个帖子（例如，更新状态）。
-
--   **路径参数**: `familyId`, `postId`
--   **请求体**: `{"status": "DONE"}`
--   **响应**:
-    -   对于简单的状态更新: `204 No Content`。
-    -   对于更复杂的更新: `200 OK`，返回更新后的 `Post` 对象。
-
----
-
-## 6. 物资清单 API
-
-所有物资都与一个特定的家庭相关联。所有端点都需要 `Authorization` 头。
-
-### `GET /api/v1/families/{familyId}/inventory`
-
-获取指定家庭的所有物资项目。
-
--   **路径参数**: `familyId` (string)
--   **响应**: `200 OK`，返回 `InventoryItem` 对象数组。
-
-### `POST /api/v1/families/{familyId}/inventory`
-
-向指定家庭的物资清单中添加一个新项目。
-
--   **路径参数**: `familyId` (string)
--   **请求体**: `Omit<InventoryItem, 'id' | 'status' | 'comments'>`
--   **响应**: `201 Created`，返回新创建的 `InventoryItem` 对象。
-
-### `PATCH /api/v1/families/{familyId}/inventory/{itemId}`
-
-更新一个物资项目的信息。
-
--   **路径参数**: `familyId`, `itemId`
--   **请求体**: `Partial<Omit<InventoryItem, 'id' | 'comments'>>`
--   **响应**:
-    -   对于简单的状态更新: `204 No Content`。
-    -   对于其他字段更新: `200 OK`，返回更新后的 `InventoryItem` 对象。
-
-### `DELETE /api/v1/families/{familyId}/inventory/{itemId}`
-
-删除一个物资项目。
-
--   **路径参数**: `familyId`, `itemId`
--   **响应**: `204 No Content`。
-
-### `POST /api/v1/families/{familyId}/inventory/{itemId}/comments`
-
-向物资项目添加一条评论。
-
--   **路径参数**: `familyId`, `itemId`
--   **请求体**: `{ "content": "..." }`
--   **响应**: `201 Created`，返回新创建的 `InventoryItemComment` 对象。
-
-### `DELETE /api/v1/families/{familyId}/inventory/{itemId}/comments/{commentId}`
-
-删除一条物资项目的评论。
-
--   **路径参数**: `familyId`, `itemId`, `commentId`
--   **响应**: `204 No Content`。
-
----
-
-## 7. 健康日志 API
-
-健康日志与用户个人绑定，但在家庭上下文中查看。所有端点都需要 `Authorization` 头。
-
-### `GET /api/v1/families/{familyId}/health-logs`
-
-获取当前登录用户在指定家庭上下文中的所有健康日志。
-
--   **路径参数**: `familyId` (string)
--   **响应**: `200 OK`，返回 `HealthLog` 对象数组。
-
-### `POST /api/v1/families/{familyId}/health-logs`
-
-为当前用户在指定家庭上下文中创建一个新的健康日志。
-
--   **路径参数**: `familyId` (string)
--   **请求体**: `Omit<HealthLog, 'id' | 'author' | 'timestamp'>`
--   **响应**: `201 Created`，返回新创建的 `HealthLog` 对象。
+### `PATCH /api/v1/applications/{id}`
+更新应用信息。

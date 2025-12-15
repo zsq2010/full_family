@@ -1,12 +1,138 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo, InventoryItemComment, InventoryCategory } from './types';
+import { Post, Assignee, ReactionType, Comment, NeedStatus, InventoryItem, InventoryStatus, AiSuggestion, HealthLog, WeatherInfo, AirQualityInfo, EnvironmentalContext, LocationInfo, InventoryItemComment, InventoryCategory, UserApplicationsResponse, UserApplicationEntry, AppConfig, ConfigData } from './types';
 import { of, Observable, throwError, forkJoin } from 'rxjs';
 // FIX: Operators should be imported from 'rxjs' directly, not 'rxjs/operators'.
 import { tap, catchError, map, switchMap, delay } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from './config';
 import { MOCK_POSTS, MOCK_INVENTORY, MOCK_HEALTH_LOGS } from './mock-data';
 import { AuthService } from './auth.service';
+
+const MOCK_USER_APPLICATIONS_RESPONSE: UserApplicationsResponse = {
+    systemSettings: {
+        "GLOBAL_HTTP_PROXY": "http://company-proxy:8888",
+        "OPENAI_API_BASE": "https://api.openai-proxy.com/v1"
+    },
+    applications: [
+        {
+            application: {
+                id: "app-theme-settings",
+                name: "APP主题设置",
+                description: "管理应用外观、主题和UI偏好设置。",
+                defaultConfig: {
+                    "features": {
+                        "featureA": false
+                    },
+                    "initialTheme": "light",
+                    "loggingLevel": "info",
+                    "userSettings": {
+                        "enabled": true
+                    },
+                    "sidebarExpanded": true
+                },
+                status: "active",
+                createdAt: "2025-12-15T14:33:49.92+08:00",
+                updatedAt: "2025-12-15T14:33:49.92+08:00"
+            },
+            appConfigs: []
+        },
+        {
+            application: {
+                id: "llm-service",
+                name: "AI 大模型中心",
+                description: "统一管理 Gemini、Ollama 等大语言模型接口。",
+                defaultConfig: {
+                    "model": "gemini-pro",
+                    "gemini": {
+                        "apiKey": ""
+                    },
+                    "ollama": {
+                        "apiServer": "http://localhost:11434"
+                    },
+                    "temperature": 0.7,
+                    "userSettings": {
+                        "enabled": true
+                    }
+                },
+                status: "active",
+                createdAt: "2025-12-15T14:33:50.07+08:00",
+                updatedAt: "2025-12-15T14:33:50.07+08:00"
+            },
+            appConfigs: []
+        },
+        {
+            application: {
+                id: "notification-service",
+                name: "消息通知中心",
+                description: "聚合邮件、Bark 等多渠道的消息推送服务。",
+                defaultConfig: {
+                    "bark": {
+                        "apiKey": ""
+                    },
+                    "email": {
+                        "address": ""
+                    },
+                    "enableDND": false,
+                    "userSettings": {
+                        "enabled": true
+                    }
+                },
+                status: "active",
+                createdAt: "2025-12-15T14:33:50.142+08:00",
+                updatedAt: "2025-12-15T14:33:50.142+08:00"
+            },
+            appConfigs: [
+              {
+                id: "appconf_me_notify_dev",
+                userId: 101,
+                appId: "notification-service",
+                environment: "development",
+                configData: {
+                    bark: {
+                        apiKey: "oSwCejcHSuzhJrPbRPLzJX"
+                    },
+                    email: {
+                        address: "asetof@outlook.com"
+                    },
+                    userSettings: {
+                        enabled: true
+                    }
+                },
+                createdAt: "2025-12-16T10:00:00.000+08:00",
+                updatedAt: "2025-12-16T10:00:00.000+08:00"
+              }
+            ]
+        },
+        {
+            application: {
+                id: "weather-service",
+                name: "天气助手",
+                description: "集成多种天气源，提供精准的本地天气预报。",
+                defaultConfig: {
+                    "hefeng": {
+                        "apiKey": ""
+                    },
+                    "source": "hefeng",
+                    "weatherOne": {
+                        "apiKey": ""
+                    },
+                    "weatherTwo": {
+                        "apiKey": ""
+                    },
+                    "userSettings": {
+                        "enabled": true
+                    },
+                    "refreshInterval": 60
+                },
+                status: "active",
+                createdAt: "2025-12-15T14:33:49.998+08:00",
+                updatedAt: "2025-12-15T14:33:49.998+08:00"
+            },
+            appConfigs: []
+        }
+    ]
+};
+
 
 @Injectable({
   providedIn: 'root'
@@ -18,6 +144,8 @@ export class DataService {
     posts = signal<Post[]>([]);
     inventory = signal<InventoryItem[]>([]);
     healthLogs = signal<HealthLog[]>([]);
+    userApplications = signal<UserApplicationEntry[]>([]);
+
 
     // This is a helper method to update a single post's AI suggestion state
     updatePostAiSuggestion(postId: number, update: { newSuggestion?: string, isLoading?: boolean, activeIndex?: number }): void {
@@ -49,6 +177,7 @@ export class DataService {
       this.posts.set([]);
       this.inventory.set([]);
       this.healthLogs.set([]);
+      this.userApplications.set([]);
     }
     
     private getFamilyApiUrl(endpoint: string): string | null {
@@ -589,6 +718,95 @@ export class DataService {
             console.error('Error in environmental context pipeline:', err);
             return throwError(() => err);
           })
+        );
+    }
+
+    // --- App Config Methods ---
+    getUserApplications(): Observable<UserApplicationsResponse> {
+        if (USE_MOCK_API) {
+            this.userApplications.set(MOCK_USER_APPLICATIONS_RESPONSE.applications);
+            return of(MOCK_USER_APPLICATIONS_RESPONSE).pipe(delay(200));
+        }
+        const url = `${API_BASE_URL}/applications/user`;
+        return this.http.get<UserApplicationsResponse>(url).pipe(
+            tap(response => {
+                this.userApplications.set(response.applications);
+            }),
+            catchError(err => {
+                console.error('Failed to fetch user applications', err);
+                this.userApplications.set([]);
+                return throwError(() => err);
+            })
+        );
+    }
+    
+    createAppConfig(config: { appId: string; environment: string; configData: ConfigData; }): Observable<AppConfig> {
+        const currentUser = this.authService.currentUser();
+        if (!currentUser) return throwError(() => new Error('User not logged in'));
+
+        if (USE_MOCK_API) {
+            const newConfig: AppConfig = {
+                id: `appconf_${Date.now()}`,
+                userId: currentUser.id,
+                ...config,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+    
+            this.userApplications.update(apps => apps.map(appEntry => {
+                if (appEntry.application.id === config.appId) {
+                    return { ...appEntry, appConfigs: [newConfig] };
+                }
+                return appEntry;
+            }));
+          
+            return of(newConfig).pipe(delay(300));
+        }
+        
+        const url = `${API_BASE_URL}/appconfigs`;
+        return this.http.post<AppConfig>(url, config).pipe(
+            tap(createdConfig => {
+                 this.userApplications.update(apps => apps.map(appEntry => {
+                    if (appEntry.application.id === createdConfig.appId) {
+                        // Assuming one config per env, replace any existing.
+                        return { ...appEntry, appConfigs: [createdConfig] };
+                    }
+                    return appEntry;
+                }));
+            })
+        );
+    }
+    
+    updateAppConfig(configId: string, configData: ConfigData): Observable<AppConfig> {
+        if (USE_MOCK_API) {
+            let updatedConfig: AppConfig | undefined;
+            this.userApplications.update(apps => apps.map(appEntry => ({
+                ...appEntry,
+                appConfigs: appEntry.appConfigs.map(conf => {
+                    if (conf.id === configId) {
+                        updatedConfig = { ...conf, configData, updatedAt: new Date().toISOString() };
+                        return updatedConfig;
+                    }
+                    return conf;
+                })
+            })));
+    
+            if (updatedConfig) {
+                return of(updatedConfig).pipe(delay(300));
+            }
+            return throwError(() => new Error('Config not found'));
+        }
+
+        const url = `${API_BASE_URL}/appconfigs/${configId}`;
+        return this.http.patch<AppConfig>(url, { configData }).pipe(
+             tap(updatedConfig => {
+                 this.userApplications.update(apps => apps.map(appEntry => ({
+                    ...appEntry,
+                    appConfigs: appEntry.appConfigs.map(conf => 
+                        conf.id === configId ? updatedConfig : conf
+                    )
+                })));
+            })
         );
     }
 }
